@@ -6,6 +6,7 @@ A tiny and easy to use Python Django-based RADIUS server for user management, co
 
 - **User Authentication**: RADIUS Access-Request handling with username/password validation
 - **Session Accounting**: RADIUS Accounting-Request handling (Start, Stop, Interim-Update)
+- **Traffic Limiting**: Configurable data usage limits per user (e.g. 10GB, 500MB)
 - **Concurrent Connection Limiting**: Configurable maximum simultaneous sessions per user
 - **Account Expiration**: Support for user account expiration dates
 - **NAS Client Management**: Manage multiple NAS clients (OpenVPN servers) with shared secrets
@@ -106,6 +107,9 @@ python3 manage.py users create user3 pass456 --expires 2025-12-31
 
 # User with both
 python3 manage.py users create user4 pass789 --max-sessions 3 --expires 2025-06-30
+
+# User with traffic limit
+python3 manage.py users create user5 pass000 --traffic-limit 10g
 ```
 
 ### 3. Start the RADIUS Server
@@ -132,6 +136,7 @@ python3 manage.py start --log-level DEBUG
 python3 manage.py users create <username> <password> [options]
   --max-sessions, -m   Maximum concurrent sessions (default: 1)
   --expires, -e        Expiration date (YYYY-MM-DD)
+  --traffic-limit, -t  Traffic limit (e.g. 5g, 100m)
   --inactive           Create as inactive
   --notes, -n          Notes about the user
 
@@ -148,6 +153,7 @@ python3 manage.py users update <username> [options]
   --password, -p       New password
   --max-sessions, -m   New max sessions
   --expires, -e        New expiration (or "never")
+  --traffic-limit, -t  New traffic limit (or "unlimited")
   --active/--inactive  Change status
 
 # Delete user

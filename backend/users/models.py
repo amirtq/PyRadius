@@ -46,6 +46,26 @@ class RadiusUser(models.Model):
         help_text="Optional notes about the user"
     )
     
+    # Traffic Accounting
+    rx_traffic = models.BigIntegerField(
+        default=0,
+        help_text="Total bytes received (download)"
+    )
+    tx_traffic = models.BigIntegerField(
+        default=0,
+        help_text="Total bytes sent (upload)"
+    )
+    total_traffic = models.BigIntegerField(
+        default=0,
+        help_text="Total traffic (rx + tx)"
+    )
+
+    allowed_traffic = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum allowed traffic in bytes (NULL for unlimited)"
+    )
+
     current_sessions = models.PositiveIntegerField(
         default=0,
         help_text="Current number of active sessions"
@@ -101,6 +121,8 @@ class RadiusUser(models.Model):
             return False, "Account is disabled"
         if self.is_expired():
             return False, "Account has expired"
+        if self.allowed_traffic is not None and self.total_traffic >= self.allowed_traffic:
+            return False, "Traffic limit reached"
         return True, "OK"
     
     def get_active_session_count(self) -> int:

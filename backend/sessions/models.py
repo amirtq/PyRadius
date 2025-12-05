@@ -131,6 +131,27 @@ class RadiusSession(models.Model):
     def __str__(self):
         return f"{self.username}@{self.nas_identifier} ({self.session_id})"
     
+    def _update_user_traffic(self, delta_rx: int, delta_tx: int) -> None:
+        """
+        Helper to atomically update user traffic stats.
+        """
+        if delta_rx <= 0 and delta_tx <= 0:
+            return
+            
+        try:
+            from users.models import RadiusUser
+            from django.db.models import F
+            
+            # We use simple update with F expressions to be atomic
+            # This avoids race conditions if multiple sessions update same user
+            RadiusUser.objects.filter(username=self.username).update(
+                rx_traffic=F('rx_traffic') + max(0, delta_rx),
+                tx_traffic=F('tx_traffic') + max(0, delta_tx),
+                total_traffic=F('total_traffic') + max(0, delta_rx) + max(0, delta_tx)
+            )
+        except Exception:
+            pass
+
     def stop_session(self, 
                      terminate_cause: int | None = None,
                      session_time: int | None = None,
@@ -141,6 +162,24 @@ class RadiusSession(models.Model):
         """
         Mark the session as stopped and update statistics.
         """
+        # Calculate deltas
+        delta_rx = 0
+        delta_tx = 0
+        
+        if input_octets is not None:
+            if input_octets < self.input_octets:
+                delta_rx = input_octets
+            else:
+                delta_rx = input_octets - self.input_octets
+                
+        if output_octets is not None:
+            if output_octets < self.output_octets:
+                delta_tx = output_octets
+            else:
+                delta_tx = output_octets - self.output_octets
+                
+        self._update_user_traffic(delta_rx, delta_tx)
+
         self.status = self.STATUS_STOPPED
         self.stop_time = timezone.now()
         
@@ -177,6 +216,27 @@ class RadiusSession(models.Model):
         """
         Update session statistics (from Interim-Update).
         """
+        # Calculate deltas before updating local state
+        delta_rx = 0
+        delta_tx = 0
+        
+        if input_octets is not None:
+            if input_octets < self.input_octets:
+                # Counter reset or overflow? Assume reset from 0
+                delta_rx = input_octets
+            else:
+                delta_rx = input_octets - self.input_octets
+                
+        if output_octets is not None:
+            if output_octets < self.output_octets:
+                # Counter reset
+                delta_tx = output_octets
+            else:
+                delta_tx = output_octets - self.output_octets
+        
+        # Update user traffic
+        self._update_user_traffic(delta_rx, delta_tx)
+
         if session_time is not None:
             self.session_time = session_time
         if input_octets is not None:

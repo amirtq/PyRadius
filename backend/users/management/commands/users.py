@@ -47,6 +47,10 @@ class Command(BaseCommand):
             '--notes', '-n', type=str, default='',
             help='Notes about the user'
         )
+        create_parser.add_argument(
+            '--traffic-limit', '-t', type=str, default=None,
+            help='Traffic limit (e.g. 5G, 100M)'
+        )
         
         # List users
         list_parser = subparsers.add_parser('list', help='List all users')
@@ -98,6 +102,10 @@ class Command(BaseCommand):
             '--notes', '-n', type=str, default=None,
             help='Notes about the user'
         )
+        update_parser.add_argument(
+            '--traffic-limit', '-t', type=str, default=None,
+            help='Traffic limit (e.g. 5G, 100M, or "unlimited")'
+        )
         
         # Show user details
         show_parser = subparsers.add_parser('show', help='Show user details')
@@ -131,6 +139,7 @@ class Command(BaseCommand):
         expires_str = options['expires']
         is_active = not options['inactive']
         notes = options['notes']
+        allowed_traffic = self._parse_traffic(options.get('traffic_limit'))
         
         # Check if user already exists
         if RadiusUser.objects.filter(username=username).exists():
@@ -147,7 +156,8 @@ class Command(BaseCommand):
             max_concurrent_sessions=max_sessions,
             expiration_date=expiration_date,
             is_active=is_active,
-            notes=notes
+            notes=notes,
+            allowed_traffic=allowed_traffic
         )
         user.set_password(password)
         user.save()
@@ -157,39 +167,21 @@ class Command(BaseCommand):
 
     def list_users(self, options):
         """List all RADIUS users."""
-        users = RadiusUser.objects.all()
-        
-        if options['active']:
-            users = [u for u in users if u.is_active]
-        elif options['inactive']:
-            users = [u for u in users if not u.is_active]
-            
-        if options['expired']:
-            users = [u for u in users if u.is_expired()]
+        users = self._filter_users(options)
         
         if not users:
             self.stdout.write('No users found')
             return
         
-        # Print header
+        # Print header (Username=20, Status=10, Max=6, Act=6, RX=10, TX=10, Total=10, Limit=10, Rem.=10, Expires=16)
         self.stdout.write(
-            f"{'Username':<20} {'Status':<10} {'Max Sessions':<12} "
-            f"{'Active Sessions':<15} {'Expires':<20}"
+            f"{'Username':<20} {'Status':<10} {'Max':<6} {'Act':<6} "
+            f"{'RX':<10} {'TX':<10} {'Total':<10} {'Limit':<10} {'Rem.':<10} {'Expires':<16}"
         )
-        self.stdout.write("-" * 80)
+        self.stdout.write("-" * 120)
         
         for user in users:
-            status = 'Active' if user.is_active else 'Inactive'
-            if user.is_expired():
-                status = 'Expired'
-            
-            active_sessions = user.get_active_session_count()
-            expires = str(user.expiration_date.strftime('%Y-%m-%d %H:%M')) if user.expiration_date else 'Never'
-            
-            self.stdout.write(
-                f"{user.username:<20} {status:<10} {user.max_concurrent_sessions:<12} "
-                f"{active_sessions:<15} {expires:<20}"
-            )
+            self._print_user_row(user)
         
         self.stdout.write(f"\nTotal: {len(users)} user(s)")
 
@@ -230,45 +222,72 @@ class Command(BaseCommand):
             raise CommandError(f'User "{username}" not found')
         
         updated = False
-        
-        if options['password']:
-            user.set_password(options['password'])
-            updated = True
-            self.stdout.write('Password updated')
-        
-        if options['max_sessions'] is not None:
-            user.max_concurrent_sessions = options['max_sessions']
-            updated = True
-            self.stdout.write(f'Max sessions set to {options["max_sessions"]}')
-        
-        if options['expires']:
-            if options['expires'].lower() == 'never':
-                user.expiration_date = None
-                self.stdout.write('Expiration removed')
-            else:
-                user.expiration_date = self._parse_date(options['expires'])
-                self.stdout.write(f'Expiration set to {user.expiration_date}')
-            updated = True
-        
-        if options['active']:
-            user.is_active = True
-            updated = True
-            self.stdout.write('User activated')
-        elif options['inactive']:
-            user.is_active = False
-            updated = True
-            self.stdout.write('User deactivated')
-        
-        if options['notes'] is not None:
-            user.notes = options['notes']
-            updated = True
-            self.stdout.write('Notes updated')
-        
+        updated |= self._handle_password_update(user, options['password'])
+        updated |= self._handle_max_sessions_update(user, options['max_sessions'])
+        updated |= self._handle_expiration_update(user, options['expires'])
+        updated |= self._handle_status_update(user, options)
+        updated |= self._handle_notes_update(user, options['notes'])
+        updated |= self._handle_traffic_limit_update(user, options.get('traffic_limit'))
+
         if updated:
             user.save()
             self.stdout.write(self.style.SUCCESS(f'Successfully updated user "{username}"'))
         else:
             self.stdout.write('No changes made')
+
+    def _handle_password_update(self, user, password):
+        if password:
+            user.set_password(password)
+            self.stdout.write('Password updated')
+            return True
+        return False
+
+    def _handle_max_sessions_update(self, user, max_sessions):
+        if max_sessions is not None:
+            user.max_concurrent_sessions = max_sessions
+            self.stdout.write(f'Max sessions set to {max_sessions}')
+            return True
+        return False
+
+    def _handle_expiration_update(self, user, expires):
+        if expires:
+            if expires.lower() == 'never':
+                user.expiration_date = None
+                self.stdout.write('Expiration removed')
+            else:
+                user.expiration_date = self._parse_date(expires)
+                self.stdout.write(f'Expiration set to {user.expiration_date}')
+            return True
+        return False
+
+    def _handle_status_update(self, user, options):
+        if options['active']:
+            user.is_active = True
+            self.stdout.write('User activated')
+            return True
+        elif options['inactive']:
+            user.is_active = False
+            self.stdout.write('User deactivated')
+            return True
+        return False
+
+    def _handle_notes_update(self, user, notes):
+        if notes is not None:
+            user.notes = notes
+            self.stdout.write('Notes updated')
+            return True
+        return False
+
+    def _handle_traffic_limit_update(self, user, traffic_limit):
+        if traffic_limit is not None:
+            if traffic_limit.lower() == 'unlimited':
+                user.allowed_traffic = None
+                self.stdout.write('Traffic limit removed')
+            else:
+                user.allowed_traffic = self._parse_traffic(traffic_limit)
+                self.stdout.write(f'Traffic limit set to {self._format_bytes(user.allowed_traffic)}')
+            return True
+        return False
 
     def show_user(self, options):
         """Show details for a RADIUS user."""
@@ -309,11 +328,49 @@ class Command(BaseCommand):
         self.stdout.write(f"  Status: {status}")
         self.stdout.write(f"  Max Concurrent Sessions: {user.max_concurrent_sessions}")
         self.stdout.write(f"  Active Sessions: {user.get_active_session_count()}")
+        
+        self.stdout.write("  Traffic:")
+        self.stdout.write(f"    RX: {self._format_bytes(user.rx_traffic)}")
+        self.stdout.write(f"    TX: {self._format_bytes(user.tx_traffic)}")
+        self.stdout.write(f"    Total: {self._format_bytes(user.total_traffic)}")
+        limit = self._format_bytes(user.allowed_traffic) if user.allowed_traffic else 'Unlimited'
+        self.stdout.write(f"    Limit: {limit}")
+        if user.allowed_traffic:
+            remaining = user.allowed_traffic - user.total_traffic
+            if remaining < 0: remaining = 0
+            self.stdout.write(f"    Remaining: {self._format_bytes(remaining)}")
+
         self.stdout.write(f"  Expiration: {user.expiration_date or 'Never'}")
         self.stdout.write(f"  Created: {user.created_at}")
         self.stdout.write(f"  Updated: {user.updated_at}")
         if user.notes:
             self.stdout.write(f"  Notes: {user.notes}")
+
+    def _parse_traffic(self, size_str):
+        """Parse a traffic size string (e.g. "1G", "500M") into bytes."""
+        if not size_str:
+            return None
+        
+        size_str = size_str.strip().lower()
+        if size_str == 'unlimited':
+            return None
+            
+        units = {'k': 1024, 'm': 1024**2, 'g': 1024**3, 't': 1024**4, 'p': 1024**5}
+        
+        try:
+            if size_str[-1] in units:
+                return int(float(size_str[:-1]) * units[size_str[-1]])
+            return int(size_str)
+        except ValueError:
+            raise CommandError(f"Invalid traffic size format: {size_str}. Use format like '1G', '500M', or bytes integer.")
+
+    def _format_bytes(self, size):
+        """Format bytes into human-readable string."""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024.0:
+                return f"{size:.2f} {unit}"
+            size /= 1024.0
+        return f"{size:.2f} PB"
 
     def _parse_date(self, date_str):
         """Parse a date string into a datetime object."""
@@ -330,3 +387,42 @@ class Command(BaseCommand):
             )
         
         raise CommandError(f'Invalid date format: {date_str}. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS')
+
+    def _filter_users(self, options):
+        """Filter users based on options."""
+        users = RadiusUser.objects.all()
+        
+        if options['active']:
+            users = [u for u in users if u.is_active]
+        elif options['inactive']:
+            users = [u for u in users if not u.is_active]
+            
+        if options['expired']:
+            users = [u for u in users if u.is_expired()]
+            
+        return users
+
+    def _print_user_row(self, user):
+        """Print a single user row."""
+        status = 'Active' if user.is_active else 'Inactive'
+        if user.is_expired():
+            status = 'Expired'
+        
+        active_sessions = user.get_active_session_count()
+        expires = str(user.expiration_date.strftime('%Y-%m-%d %H:%M')) if user.expiration_date else 'Never'
+        
+        rx = self._format_bytes(user.rx_traffic)
+        tx = self._format_bytes(user.tx_traffic)
+        total = self._format_bytes(user.total_traffic)
+        limit = self._format_bytes(user.allowed_traffic) if user.allowed_traffic else 'Unl.'
+
+        remaining_str = 'Unl.'
+        if user.allowed_traffic:
+            remaining = user.allowed_traffic - user.total_traffic
+            if remaining < 0: remaining = 0
+            remaining_str = self._format_bytes(remaining)
+
+        self.stdout.write(
+            f"{user.username:<20} {status:<10} {user.max_concurrent_sessions:<6} "
+            f"{active_sessions:<6} {rx:<10} {tx:<10} {total:<10} {limit:<10} {remaining_str:<10} {expires:<16}"
+        )
