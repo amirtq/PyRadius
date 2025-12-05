@@ -1,0 +1,5 @@
+penv/
+__pycache__/
+*.py[cod]
+*$py.class
+backend/db.sqlite3
