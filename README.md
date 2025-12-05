@@ -234,15 +234,19 @@ plugin /usr/lib/openvpn/radiusplugin.so /etc/openvpn/radiusplugin.conf
 
 ## Configuration
 
-Server configuration is in `config/settings.py` (inside `backend/` directory):
+Server configuration is managed via environment variables or the `.env` file (inside `backend/` directory).
 
-```python3
-RADIUS_CONFIG = {
-    'AUTH_PORT': 1812,      # Authentication port
-    'ACCT_PORT': 1813,      # Accounting port
-    'BIND_ADDRESS': '0.0.0.0',  # Listen on all interfaces
-    'LOG_LEVEL': 'DEBUG',   # Logging level
-}
+Default configuration in `.env`:
+
+```bash
+# RADIUS Configuration
+AUTH_PORT=1812
+ACCT_PORT=1813
+BIND_ADDRESS=0.0.0.0
+LOG_LEVEL=DEBUG
+ACCT_INTERIM_INTERVAL=60
+RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT=1000
+RADIUS_LOG_RETENTION=1000
 ```
 
 ## Architecture
