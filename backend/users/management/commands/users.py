@@ -182,12 +182,12 @@ class Command(BaseCommand):
             self.stdout.write('No users found')
             return
         
-        # Print header (Username=20, Password=15, Status=10, Max=6, Act=6, RX=10, TX=10, Total=10, Limit=10, Rem.=10, Expires=16)
+        # Print header (Username=20, Password=15, Status=10, ExpDate=16, MaxConnections=16, ActiveConnections=18, TotalQuota=12, RX=10, TX=10, UsedQuota=10, RemainingQuota=10)
         self.stdout.write(
-            f"{'Username':<20} {'Password':<15} {'Status':<10} {'Max':<6} {'Act':<6} "
-            f"{'RX':<10} {'TX':<10} {'Total':<10} {'Limit':<10} {'Rem.':<10} {'Expires':<16}"
+            f"{'Username':<20} {'Password':<15} {'Status':<10} {'ExpDate':<16} {'MaxConnections':<16} {'ActiveConnections':<18} "
+            f"{'TotalQuota':<12} {'RX':<10} {'TX':<10} {'UsedQuota':<10} {'RemainingQuota':<10}"
         )
-        self.stdout.write("-" * 135)
+        self.stdout.write("-" * 160)
         
         for user in users:
             self._print_user_row(user)
@@ -329,9 +329,13 @@ class Command(BaseCommand):
 
     def _print_user_details(self, user):
         """Print detailed user information."""
-        status = 'Active' if user.is_active else 'Inactive'
-        if user.is_expired():
+        status = 'OK'
+        if not user.is_active:
+            status = 'Disabled'
+        elif user.is_expired():
             status = 'Expired'
+        elif user.allowed_traffic is not None and user.total_traffic >= user.allowed_traffic:
+            status = 'OverQuota'
         
         self.stdout.write(f"\nUser: {user.username}")
         self.stdout.write(f"  Status: {status}")
@@ -413,9 +417,13 @@ class Command(BaseCommand):
 
     def _print_user_row(self, user):
         """Print a single user row."""
-        status = 'Active' if user.is_active else 'Inactive'
-        if user.is_expired():
+        status = 'OK'
+        if not user.is_active:
+            status = 'Disabled'
+        elif user.is_expired():
             status = 'Expired'
+        elif user.allowed_traffic is not None and user.total_traffic >= user.allowed_traffic:
+            status = 'OverQuota'
         
         # Determine password display
         pwd_display = 'Encrypted'
@@ -437,6 +445,6 @@ class Command(BaseCommand):
             remaining_str = self._format_bytes(remaining)
 
         self.stdout.write(
-            f"{user.username:<20} {pwd_display:<15} {status:<10} {user.max_concurrent_sessions:<6} "
-            f"{active_sessions:<6} {rx:<10} {tx:<10} {total:<10} {limit:<10} {remaining_str:<10} {expires:<16}"
+            f"{user.username:<20} {pwd_display:<15} {status:<10} {expires:<16} {user.max_concurrent_sessions:<16} "
+            f"{active_sessions:<18} {limit:<12} {rx:<10} {tx:<10} {total:<10} {remaining_str:<10}"
         )
