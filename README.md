@@ -110,6 +110,9 @@ python3 manage.py users create user4 pass789 --max-sessions 3 --expires 2025-06-
 
 # User with traffic limit
 python3 manage.py users create user5 pass000 --traffic-limit 10g
+
+# User with cleartext password (stored as ctp:password)
+python3 manage.py users create user6 pass123 -ctp
 ```
 
 ### 3. Start the RADIUS Server
@@ -134,11 +137,12 @@ python3 manage.py start --log-level DEBUG
 ```bash
 # Create user
 python3 manage.py users create <username> <password> [options]
-  --max-sessions, -m   Maximum concurrent sessions (default: 1)
-  --expires, -e        Expiration date (YYYY-MM-DD)
-  --traffic-limit, -t  Traffic limit (e.g. 5g, 100m)
-  --inactive           Create as inactive
-  --notes, -n          Notes about the user
+  --clear-text-password, -ctp  Store password in clear text
+  --max-sessions, -m           Maximum concurrent sessions (default: 1)
+  --expires, -e                Expiration date (YYYY-MM-DD)
+  --traffic-limit, -t          Traffic limit (e.g. 5g, 100m)
+  --inactive                   Create as inactive
+  --notes, -n                  Notes about the user
 
 # List users
 python3 manage.py users list
@@ -151,6 +155,7 @@ python3 manage.py users show <username>
 # Update user
 python3 manage.py users update <username> [options]
   --password, -p       New password
+  --clear-text-password, -ctp  Store password in clear text
   --max-sessions, -m   New max sessions
   --expires, -e        New expiration (or "never")
   --traffic-limit, -t  New traffic limit (or "unlimited")

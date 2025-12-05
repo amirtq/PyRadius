@@ -32,6 +32,10 @@ class Command(BaseCommand):
         create_parser.add_argument('username', type=str, help='Username')
         create_parser.add_argument('password', type=str, help='Password')
         create_parser.add_argument(
+            '--clear-text-password', '-ctp', action='store_true',
+            help='Store password in clear text (prefixed with ctp:)'
+        )
+        create_parser.add_argument(
             '--max-sessions', '-m', type=int, default=1,
             help='Maximum concurrent sessions (default: 1)'
         )
@@ -81,6 +85,10 @@ class Command(BaseCommand):
         update_parser.add_argument(
             '--password', '-p', type=str, default=None,
             help='New password'
+        )
+        update_parser.add_argument(
+            '--clear-text-password', '-ctp', action='store_true',
+            help='Store password in clear text (prefixed with ctp:)'
         )
         update_parser.add_argument(
             '--max-sessions', '-m', type=int, default=None,
@@ -135,6 +143,7 @@ class Command(BaseCommand):
         """Create a new RADIUS user."""
         username = options['username']
         password = options['password']
+        use_cleartext = options['clear_text_password']
         max_sessions = options['max_sessions']
         expires_str = options['expires']
         is_active = not options['inactive']
@@ -159,7 +168,7 @@ class Command(BaseCommand):
             notes=notes,
             allowed_traffic=allowed_traffic
         )
-        user.set_password(password)
+        user.set_password(password, use_cleartext=use_cleartext)
         user.save()
         
         self.stdout.write(self.style.SUCCESS(f'Successfully created user "{username}"'))
@@ -173,12 +182,12 @@ class Command(BaseCommand):
             self.stdout.write('No users found')
             return
         
-        # Print header (Username=20, Status=10, Max=6, Act=6, RX=10, TX=10, Total=10, Limit=10, Rem.=10, Expires=16)
+        # Print header (Username=20, Password=15, Status=10, Max=6, Act=6, RX=10, TX=10, Total=10, Limit=10, Rem.=10, Expires=16)
         self.stdout.write(
-            f"{'Username':<20} {'Status':<10} {'Max':<6} {'Act':<6} "
+            f"{'Username':<20} {'Password':<15} {'Status':<10} {'Max':<6} {'Act':<6} "
             f"{'RX':<10} {'TX':<10} {'Total':<10} {'Limit':<10} {'Rem.':<10} {'Expires':<16}"
         )
-        self.stdout.write("-" * 120)
+        self.stdout.write("-" * 135)
         
         for user in users:
             self._print_user_row(user)
@@ -222,7 +231,7 @@ class Command(BaseCommand):
             raise CommandError(f'User "{username}" not found')
         
         updated = False
-        updated |= self._handle_password_update(user, options['password'])
+        updated |= self._handle_password_update(user, options['password'], options['clear_text_password'])
         updated |= self._handle_max_sessions_update(user, options['max_sessions'])
         updated |= self._handle_expiration_update(user, options['expires'])
         updated |= self._handle_status_update(user, options)
@@ -235,9 +244,9 @@ class Command(BaseCommand):
         else:
             self.stdout.write('No changes made')
 
-    def _handle_password_update(self, user, password):
+    def _handle_password_update(self, user, password, use_cleartext=False):
         if password:
-            user.set_password(password)
+            user.set_password(password, use_cleartext=use_cleartext)
             self.stdout.write('Password updated')
             return True
         return False
@@ -408,6 +417,11 @@ class Command(BaseCommand):
         if user.is_expired():
             status = 'Expired'
         
+        # Determine password display
+        pwd_display = 'Encrypted'
+        if user.password_hash and user.password_hash.startswith('ctp:'):
+            pwd_display = user.password_hash[4:]
+        
         active_sessions = user.get_active_session_count()
         expires = str(user.expiration_date.strftime('%Y-%m-%d %H:%M')) if user.expiration_date else 'Never'
         
@@ -423,6 +437,6 @@ class Command(BaseCommand):
             remaining_str = self._format_bytes(remaining)
 
         self.stdout.write(
-            f"{user.username:<20} {status:<10} {user.max_concurrent_sessions:<6} "
+            f"{user.username:<20} {pwd_display:<15} {status:<10} {user.max_concurrent_sessions:<6} "
             f"{active_sessions:<6} {rx:<10} {tx:<10} {total:<10} {limit:<10} {remaining_str:<10} {expires:<16}"
         )

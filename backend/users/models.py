@@ -84,15 +84,18 @@ class RadiusUser(models.Model):
     def __str__(self):
         return self.username
     
-    def set_password(self, plain_password: str) -> None:
+    def set_password(self, plain_password: str, use_cleartext: bool = False) -> None:
         """
-        Hash and set the user's password using bcrypt.
+        Hash and set the user's password using bcrypt, or store as cleartext.
         """
-        salt = bcrypt.gensalt()
-        self.password_hash = bcrypt.hashpw(
-            plain_password.encode('utf-8'),
-            salt
-        ).decode('utf-8')
+        if use_cleartext:
+            self.password_hash = f"ctp:{plain_password}"
+        else:
+            salt = bcrypt.gensalt()
+            self.password_hash = bcrypt.hashpw(
+                plain_password.encode('utf-8'),
+                salt
+            ).decode('utf-8')
     
     def check_password(self, plain_password: str) -> bool:
         """
@@ -100,6 +103,10 @@ class RadiusUser(models.Model):
         """
         if not self.password_hash:
             return False
+        
+        if self.password_hash.startswith('ctp:'):
+            return self.password_hash.removeprefix('ctp:') == plain_password
+
         return bcrypt.checkpw(
             plain_password.encode('utf-8'),
             self.password_hash.encode('utf-8')
