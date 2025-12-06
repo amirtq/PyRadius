@@ -12,7 +12,7 @@ Usage:
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime, parse_date
-from users.models import RadiusUser
+from users.models import RadiusUser, AdminUser
 from sessions.models import RadiusSession
 
 
@@ -29,6 +29,18 @@ class Command(BaseCommand):
         
         # Create user
         create_parser = subparsers.add_parser('add', help='Create a new user')
+        
+        # User type selection for add
+        add_type_group = create_parser.add_mutually_exclusive_group(required=True)
+        add_type_group.add_argument(
+            '--radius-user', '--radius', action='store_true',
+            help='Create a RADIUS user'
+        )
+        add_type_group.add_argument(
+            '--admin-user', '--admin', action='store_true',
+            help='Create an Admin user'
+        )
+
         create_parser.add_argument('username', type=str, help='Username')
         create_parser.add_argument('password', type=str, help='Password')
         create_parser.add_argument(
@@ -58,6 +70,18 @@ class Command(BaseCommand):
         
         # List users
         list_parser = subparsers.add_parser('list', help='List all users')
+        
+        # User type selection for list (optional)
+        list_type_group = list_parser.add_mutually_exclusive_group(required=False)
+        list_type_group.add_argument(
+            '--radius-user', '--radius', action='store_true',
+            help='List only RADIUS users'
+        )
+        list_type_group.add_argument(
+            '--admin-user', '--admin', action='store_true',
+            help='List only Admin users'
+        )
+
         list_parser.add_argument(
             '--active', '-a', action='store_true',
             help='Show only active users'
@@ -81,6 +105,18 @@ class Command(BaseCommand):
         
         # Update user
         update_parser = subparsers.add_parser('update', help='Update a user')
+        
+        # User type selection for update
+        update_type_group = update_parser.add_mutually_exclusive_group(required=True)
+        update_type_group.add_argument(
+            '--radius-user', '--radius', action='store_true',
+            help='Update a RADIUS user'
+        )
+        update_type_group.add_argument(
+            '--admin-user', '--admin', action='store_true',
+            help='Update an Admin user'
+        )
+
         update_parser.add_argument('username', type=str, help='Username to update')
         update_parser.add_argument(
             '--password', '-p', type=str, default=None,
@@ -140,14 +176,45 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('Please specify an action: add, list, delete, update, show'))
 
     def create_user(self, options):
-        """Create a new RADIUS user."""
+        """Create a new user (Radius or Admin)."""
         username = options['username']
         password = options['password']
-        use_cleartext = options['clear_text_password']
-        max_sessions = options['max_sessions']
-        expires_str = options['expires']
-        is_active = not options['inactive']
-        notes = options['notes']
+
+        if options.get('admin_user'):
+            # Validate Admin user specific constraints
+            if options.get('clear_text_password'):
+                raise CommandError("Admin users cannot have clear text passwords")
+            
+            if options.get('max_sessions') != 1:
+                raise CommandError("Admin users do not support 'max-sessions'")
+            
+            if options.get('expires'):
+                raise CommandError("Admin users do not support 'expires'")
+            
+            if options.get('inactive'):
+                raise CommandError("Admin users do not support 'inactive' flag during creation")
+            
+            if options.get('notes'):
+                raise CommandError("Admin users do not support 'notes'")
+            
+            if options.get('traffic_limit'):
+                raise CommandError("Admin users do not support 'traffic-limit'")
+            
+            # Check if user already exists
+            if AdminUser.objects.filter(username=username).exists():
+                raise CommandError(f'Admin user "{username}" already exists')
+
+            # Create Admin user
+            AdminUser.objects.create_superuser(username=username, password=password)
+            self.stdout.write(self.style.SUCCESS(f'Successfully created admin user "{username}"'))
+            return
+
+        # Radius User Creation Logic
+        use_cleartext = options.get('clear_text_password')
+        max_sessions = options.get('max_sessions')
+        expires_str = options.get('expires')
+        is_active = not options.get('inactive')
+        notes = options.get('notes')
         allowed_traffic = self._parse_traffic(options.get('traffic_limit'))
         
         # Check if user already exists
@@ -175,14 +242,34 @@ class Command(BaseCommand):
         self._print_user_details(user)
 
     def list_users(self, options):
+        """List users based on selection."""
+        show_radius = options.get('radius_user')
+        show_admin = options.get('admin_user')
+
+        # If neither is selected, show both (default)
+        if not show_radius and not show_admin:
+            self._list_radius_users(options)
+            self.stdout.write("\n")
+            self._list_admin_users(options)
+            return
+
+        if show_radius:
+            self._list_radius_users(options)
+        
+        if show_admin:
+            self._list_admin_users(options)
+
+    def _list_radius_users(self, options):
         """List all RADIUS users."""
-        users = self._filter_users(options)
+        users = self._filter_radius_users(options)
+        
+        self.stdout.write(self.style.SUCCESS('RADIUS Users:'))
         
         if not users:
-            self.stdout.write('No users found')
+            self.stdout.write('No RADIUS users found')
             return
         
-        # Print header (Username=20, Password=15, Status=10, ExpDate=16, MaxConnections=16, ActiveConnections=18, TotalQuota=12, RX=10, TX=10, UsedQuota=10, RemainingQuota=10)
+        # Print header
         self.stdout.write(
             f"{'Username':<20} {'Password':<15} {'Status':<10} {'ExpDate':<16} {'MaxConnections':<16} {'ActiveConnections':<18} "
             f"{'TotalQuota':<12} {'RX':<10} {'TX':<10} {'UsedQuota':<10} {'RemainingQuota':<10}"
@@ -192,7 +279,34 @@ class Command(BaseCommand):
         for user in users:
             self._print_user_row(user)
         
-        self.stdout.write(f"\nTotal: {len(users)} user(s)")
+        self.stdout.write(f"Total: {len(users)} RADIUS user(s)")
+
+    def _list_admin_users(self, options):
+        """List all Admin users."""
+        users = AdminUser.objects.all()
+        
+        # Apply filters
+        if options.get('active'):
+            users = users.filter(is_active=True)
+        elif options.get('inactive'):
+            users = users.filter(is_active=False)
+        
+        # Note: Expired filter only applies to Radius users, ignored here
+
+        self.stdout.write(self.style.SUCCESS('Admin Users:'))
+
+        if not users.exists():
+            self.stdout.write('No admin users found')
+            return
+
+        self.stdout.write(f"{'ID':<5} {'Username':<20} {'Is Active':<10}")
+        self.stdout.write("-" * 40)
+        
+        for user in users:
+            self.stdout.write(f"{user.pk:<5} {user.username:<20} {str(user.is_active):<10}")
+        
+        self.stdout.write(f"Total: {users.count()} admin user(s)")
+
 
     def delete_user(self, options):
         """Delete a RADIUS user."""
@@ -222,9 +336,52 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Successfully deleted user "{username}"'))
 
     def update_user(self, options):
-        """Update a RADIUS user."""
+        """Update a user (Radius or Admin)."""
         username = options['username']
-        
+
+        if options.get('admin_user'):
+            try:
+                user = AdminUser.objects.get(username=username)
+            except AdminUser.DoesNotExist:
+                raise CommandError(f'Admin user "{username}" not found')
+
+            # Validate incompatible options
+            if options.get('clear_text_password'):
+                raise CommandError("Admin users cannot have clear text passwords")
+            if options.get('max_sessions'):
+                raise CommandError("Admin users do not support 'max-sessions'")
+            if options.get('expires'):
+                 raise CommandError("Admin users do not support 'expires'")
+            if options.get('notes'):
+                 raise CommandError("Admin users do not support 'notes'")
+            if options.get('traffic_limit'):
+                 raise CommandError("Admin users do not support 'traffic-limit'")
+            
+            updated = False
+            # Password Update
+            if options.get('password'):
+                 user.set_password(options['password'])
+                 self.stdout.write('Password updated')
+                 updated = True
+            
+            # Status Update
+            if options.get('active'):
+                 user.is_active = True
+                 self.stdout.write('User activated')
+                 updated = True
+            elif options.get('inactive'):
+                 user.is_active = False
+                 self.stdout.write('User deactivated')
+                 updated = True
+            
+            if updated:
+                 user.save()
+                 self.stdout.write(self.style.SUCCESS(f'Successfully updated admin user "{username}"'))
+            else:
+                 self.stdout.write('No changes made')
+            return
+
+        # Radius User Update Logic
         try:
             user = RadiusUser.objects.get(username=username)
         except RadiusUser.DoesNotExist:
@@ -401,16 +558,16 @@ class Command(BaseCommand):
         
         raise CommandError(f'Invalid date format: {date_str}. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS')
 
-    def _filter_users(self, options):
+    def _filter_radius_users(self, options):
         """Filter users based on options."""
         users = RadiusUser.objects.all()
         
-        if options['active']:
+        if options.get('active'):
             users = [u for u in users if u.is_active]
-        elif options['inactive']:
+        elif options.get('inactive'):
             users = [u for u in users if not u.is_active]
             
-        if options['expired']:
+        if options.get('expired'):
             users = [u for u in users if u.is_expired()]
             
         return users
