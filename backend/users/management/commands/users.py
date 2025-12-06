@@ -2,7 +2,7 @@
 Django management command for RADIUS user management.
 
 Usage:
-    python manage.py users create <username> <password> [options]
+    python manage.py users add <username> <password> [options]
     python manage.py users list [options]
     python manage.py users delete <username>
     python manage.py users update <username> [options]
@@ -28,7 +28,7 @@ class Command(BaseCommand):
         subparsers = parser.add_subparsers(dest='action', help='Action to perform')
         
         # Create user
-        create_parser = subparsers.add_parser('create', help='Create a new user')
+        create_parser = subparsers.add_parser('add', help='Create a new user')
         create_parser.add_argument('username', type=str, help='Username')
         create_parser.add_argument('password', type=str, help='Password')
         create_parser.add_argument(
@@ -126,7 +126,7 @@ class Command(BaseCommand):
 
         action = options.get('action')
         
-        if action == 'create':
+        if action == 'add':
             self.create_user(options)
         elif action == 'list':
             self.list_users(options)
@@ -137,7 +137,7 @@ class Command(BaseCommand):
         elif action == 'show':
             self.show_user(options)
         else:
-            self.stdout.write(self.style.ERROR('Please specify an action: create, list, delete, update, show'))
+            self.stdout.write(self.style.ERROR('Please specify an action: add, list, delete, update, show'))
 
     def create_user(self, options):
         """Create a new RADIUS user."""

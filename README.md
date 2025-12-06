@@ -50,7 +50,7 @@ docker exec -it pyradius python manage.py nasclients add openvpn 192.168.0.1 sha
 
 **Create a User:**
 ```bash
-docker exec -it pyradius python manage.py users create testuser testpassword
+docker exec -it pyradius python manage.py users add testuser testpassword
 ```
 
 **List Active Sessions:**
@@ -97,22 +97,22 @@ Create a user with optional concurrent session limit and expiration:
 
 ```bash
 # Basic user (1 concurrent session, no expiration)
-python3 manage.py users create testuser testpassword
+python3 manage.py users add testuser testpassword
 
 # User with 2 concurrent sessions
-python3 manage.py users create user2 pass123 --max-sessions 2
+python3 manage.py users add user2 pass123 --max-sessions 2
 
 # User with expiration date
-python3 manage.py users create user3 pass456 --expires 2025-12-31
+python3 manage.py users add user3 pass456 --expires 2025-12-31
 
 # User with both
-python3 manage.py users create user4 pass789 --max-sessions 3 --expires 2025-06-30
+python3 manage.py users add user4 pass789 --max-sessions 3 --expires 2025-06-30
 
 # User with traffic limit
-python3 manage.py users create user5 pass000 --traffic-limit 10g
+python3 manage.py users add user5 pass000 --traffic-limit 10g
 
 # User with cleartext password (stored as ctp:password)
-python3 manage.py users create user6 pass123 -ctp
+python3 manage.py users add user6 pass123 -ctp
 ```
 
 ### 3. Start the RADIUS Server
@@ -136,7 +136,7 @@ python3 manage.py start --log-level DEBUG
 
 ```bash
 # Create user
-python3 manage.py users create <username> <password> [options]
+python3 manage.py users add <username> <password> [options]
   --clear-text-password, -ctp  Store password in clear text
   --max-sessions, -m           Maximum concurrent sessions (default: 1)
   --expires, -e                Expiration date (YYYY-MM-DD)
