@@ -1,6 +1,6 @@
 services:
   radius:
-    build: ./backend
+    build: .
     container_name: pyradius
     restart: always
     ports:

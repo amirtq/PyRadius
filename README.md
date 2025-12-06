@@ -1,17 +1,17 @@
 # RADIUS Server for OpenVPN
 
-A tiny and easy to use Python Django-based RADIUS server for user management, concurrent session limiting, and account expiration.
+A tiny, easy-to-use, and feature-rich Python Django-based RADIUS server for user management, concurrent session limiting, and traffic accounting. Includes a modern React-based Web UI.
 
 ## Features
 
-- **User Authentication**: RADIUS Access-Request handling with username/password validation
-- **Session Accounting**: RADIUS Accounting-Request handling (Start, Stop, Interim-Update)
-- **Traffic Limiting**: Configurable data usage limits per user (e.g. 10GB, 500MB)
-- **Concurrent Connection Limiting**: Configurable maximum simultaneous sessions per user
-- **Account Expiration**: Support for user account expiration dates
-- **NAS Client Management**: Manage multiple NAS clients (OpenVPN servers) with shared secrets
-- **Django Admin**: Built-in admin interface for management (future web UI)
-- **SQLite Database**: Simple file-based storage, easily upgradeable to PostgreSQL/MySQL
+- **Modern Web Dashboard**: Comprehensive React-based UI for managing users, NAS clients, sessions, and viewing logs.
+- **User Authentication**: RADIUS Access-Request handling with username/password validation.
+- **Session Accounting**: RADIUS Accounting-Request handling (Start, Stop, Interim-Update).
+- **Traffic Limiting**: Configurable data usage limits per user (e.g. 10GB, 500MB).
+- **Concurrent Connection Limiting**: Configurable maximum simultaneous sessions per user.
+- **Account Expiration**: Support for user account expiration dates.
+- **NAS Client Management**: Manage multiple NAS clients (OpenVPN servers) with shared secrets.
+- **SQLite Database**: Simple file-based storage, easily upgradeable to PostgreSQL/MySQL.
 
 ## Requirements
 
@@ -19,6 +19,7 @@ A tiny and easy to use Python Django-based RADIUS server for user management, co
 - Django 4.2+
 - pyrad 2.4+
 - bcrypt 4.0+
+- (Optional) Node.js 18+ for frontend development
 
 ## Docker Setup (Recommended)
 
@@ -32,9 +33,16 @@ chmod 664 backend/db.sqlite3
 ```bash
 docker-compose up -d --build
 ```
-The server will start on ports 1812/1813 (UDP).
+- **Web Dashboard**: http://server_ip
+- **RADIUS Auth Port**: 1812/udp
+- **RADIUS Acct Port**: 1813/udp
 
-3. View logs:
+3. Create an Administrator (required for Web UI):
+```bash
+docker exec -it pyradius python manage.py users add --admin-user admin password123
+```
+
+4. View logs:
 ```bash
 docker-compose logs -f
 ```
@@ -50,7 +58,7 @@ docker exec -it pyradius python manage.py nasclients add openvpn 192.168.0.1 sha
 
 **Create a User:**
 ```bash
-docker exec -it pyradius python manage.py users add testuser testpassword
+docker exec -it pyradius python manage.py users add --radius-user testuser testpassword
 ```
 
 **List Active Sessions:**
@@ -62,7 +70,7 @@ docker exec -it pyradius python manage.py sessions list --active
 
 1. Clone the repository and navigate to backend:
 ```bash
-cd /home/xxx/PyRadius/backend
+cd /path/to/PyRadius/backend
 ```
 
 2. Create and activate a virtual environment:
@@ -81,9 +89,25 @@ pip install -r requirements.txt
 python3 manage.py migrate
 ```
 
-## Quick Start
+5. Create an Administrator (required for Web UI):
+```bash
+python3 manage.py users add --admin-user admin password123
+```
 
-### 1. Add a NAS Client (OpenVPN Server)
+> **Note**: The frontend is pre-built in `backend/frontend_dist`. If you want to modify the frontend, you'll need to build it using `cd frontend && npm install && npm run build` and ensure the output is in `backend/frontend_dist`.
+
+## Quick Start (Manual)
+
+### 1. Start the RADIUS Server
+
+```bash
+# Start with default settings (Web on 8000, RADIUS on 1812/1813)
+python3 manage.py start &
+python3 manage.py runserver 0.0.0.0:8000
+```
+Visit **http://server_ip:8000** to login with your admin credentials.
+
+### 2. Add a NAS Client (OpenVPN Server)
 
 Add your OpenVPN server as a NAS client with its shared secret:
 
@@ -91,52 +115,45 @@ Add your OpenVPN server as a NAS client with its shared secret:
 python3 manage.py nasclients add openvpn 192.168.0.1 sharedsecret --description "OpenVPN Server"
 ```
 
-### 2. Create a User
+### 3. Create a User
 
 Create a user with optional concurrent session limit and expiration:
 
 ```bash
-# Basic user (1 concurrent session, no expiration)
-python3 manage.py users add testuser testpassword
+# Basic RADIUS user (1 concurrent session, no expiration)
+python3 manage.py users add --radius-user testuser testpassword
 
 # User with 2 concurrent sessions
-python3 manage.py users add user2 pass123 --max-sessions 2
+python3 manage.py users add --radius-user user2 pass123 --max-sessions 2
 
 # User with expiration date
-python3 manage.py users add user3 pass456 --expires 2025-12-31
+python3 manage.py users add --radius-user user3 pass456 --expires 2025-12-31
 
 # User with both
-python3 manage.py users add user4 pass789 --max-sessions 3 --expires 2025-06-30
+python3 manage.py users add --radius-user user4 pass789 --max-sessions 3 --expires 2025-06-30
 
 # User with traffic limit
-python3 manage.py users add user5 pass000 --traffic-limit 10g
+python3 manage.py users add --radius-user user5 pass000 --traffic-limit 10g
 
 # User with cleartext password (stored as ctp:password)
-python3 manage.py users add user6 pass123 -ctp
+python3 manage.py users add --radius-user user6 pass123 -ctp
 ```
-
-### 3. Start the RADIUS Server
-
-```bash
-# Start with default settings (ports 1812/1813)
-python3 manage.py start
-
-# Start with custom ports
-python3 manage.py start --auth-port 1812 --acct-port 1813
-
-# Start with debug logging
-python3 manage.py start --log-level DEBUG
-```
-
-**Note**: Ports below 1024 require root privileges.
 
 ## Management Commands
 
+The Web UI is the easiest way to manage users and settings, but the CLI is fully supported.
+
 ### User Management (`users`)
 
+**General Usage:**
 ```bash
-# Create user
-python3 manage.py users add <username> <password> [options]
+python3 manage.py users <action> [options]
+```
+
+**Create User:**
+```bash
+# Add a RADIUS User
+python3 manage.py users add --radius-user <username> <password> [options]
   --clear-text-password, -ctp  Store password in clear text
   --max-sessions, -m           Maximum concurrent sessions (default: 1)
   --expires, -e                Expiration date (YYYY-MM-DD)
@@ -144,26 +161,54 @@ python3 manage.py users add <username> <password> [options]
   --inactive                   Create as inactive
   --notes, -n                  Notes about the user
 
-# List users
+# Add an Admin User (for Web Dashboard)
+python3 manage.py users add --admin-user <username> <password>
+```
+
+**List Users:**
+```bash
+# List all users (both RADIUS and Admin)
 python3 manage.py users list
+
+# List specific user types
+python3 manage.py users list --radius-user
+python3 manage.py users list --admin-user
+
+# Filter lists
 python3 manage.py users list --active    # Only active users
-python3 manage.py users list --expired   # Only expired users
+python3 manage.py users list --expired   # Only expired users (RADIUS only)
+python3 manage.py users list --inactive  # Only inactive users
+```
 
-# Show user details
-python3 manage.py users show <username>
-
-# Update user
-python3 manage.py users update <username> [options]
+**Update User:**
+```bash
+# Update a RADIUS User
+python3 manage.py users update --radius-user <username> [options]
   --password, -p       New password
   --clear-text-password, -ctp  Store password in clear text
   --max-sessions, -m   New max sessions
   --expires, -e        New expiration (or "never")
   --traffic-limit, -t  New traffic limit (or "unlimited")
   --active/--inactive  Change status
+  --notes, -n          Update notes
 
-# Delete user
+# Update an Admin User
+python3 manage.py users update --admin-user <username> [options]
+  --password, -p       New password
+  --active/--inactive  Change status
+```
+
+**Delete User:**
+```bash
+# Delete a RADIUS User
 python3 manage.py users delete <username>
 python3 manage.py users delete <username> --force
+```
+
+**Show User Details:**
+```bash
+# Show RADIUS User details
+python3 manage.py users show <username>
 ```
 
 ### NAS Management (`nasclients`)
@@ -263,27 +308,25 @@ RADIUS_LOG_RETENTION=1000
 ## Architecture
 
 ```
-backend/
-├── manage.py                 # Django management script
-├── config/                   # Django project settings
-│   ├── settings.py
-│   └── urls.py
-├── users/                    # User management app
-│   ├── models.py            # RadiusUser model
-│   └── management/commands/  # users management command
-├── nas/                      # NAS client management
-│   ├── models.py            # NASClient model
-│   └── management/commands/  # nasclients management command
-├── sessions/                 # Session tracking
-│   ├── models.py            # RadiusSession model
-│   └── management/commands/  # sessions management command
-├── radius/                   # RADIUS protocol implementation
-│   ├── server.py            # UDP RADIUS server
-│   ├── auth_handler.py      # Authentication handler
-│   ├── acct_handler.py      # Accounting handler
-│   ├── dictionary.txt       # RADIUS attribute dictionary
-│   └── management/commands/ # start command
-└── db.sqlite3               # SQLite database
+.
+├── backend/                  # Django Backend
+│   ├── nas/                  # NAS client management
+│   ├── radius/               # RADIUS protocol implementation
+│   ├── sessions/             # Session tracking
+│   ├── users/                # User management
+│   ├── frontend_dist/        # Compiled Frontend assets (served by Django)
+│   ├── manage.py             # Django management script
+│   └── ...
+├── frontend/                 # React Frontend
+│   ├── src/                  # Source code
+│   │   ├── pages/            # Dashboard pages
+│   │   ├── components/       # UI Components
+│   │   └── ...
+│   ├── package.json          # Node dependencies
+│   └── vite.config.js        # Build configuration
+├── docker-compose.yml        # Docker orchestration
+├── Dockerfile                # Multi-stage Docker build
+└── entrypoint.sh             # Container startup script
 ```
 
 ## Authentication Flow
