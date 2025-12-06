@@ -1,4 +1,4 @@
-Django>=4.2
+Django>=6.0
 pyrad>=2.4
 bcrypt>=4.0
 python-dotenv>=1.0.0
