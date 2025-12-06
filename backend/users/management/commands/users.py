@@ -177,37 +177,47 @@ class Command(BaseCommand):
 
     def create_user(self, options):
         """Create a new user (Radius or Admin)."""
+        if options.get('admin_user'):
+            self._create_admin_user(options)
+        else:
+            self._create_radius_user(options)
+
+    def _create_admin_user(self, options):
+        """Helper to create an Admin user with validation."""
         username = options['username']
         password = options['password']
 
-        if options.get('admin_user'):
-            # Validate Admin user specific constraints
-            if options.get('clear_text_password'):
-                raise CommandError("Admin users cannot have clear text passwords")
-            
-            if options.get('max_sessions') != 1:
-                raise CommandError("Admin users do not support 'max-sessions'")
-            
-            if options.get('expires'):
-                raise CommandError("Admin users do not support 'expires'")
-            
-            if options.get('inactive'):
-                raise CommandError("Admin users do not support 'inactive' flag during creation")
-            
-            if options.get('notes'):
-                raise CommandError("Admin users do not support 'notes'")
-            
-            if options.get('traffic_limit'):
-                raise CommandError("Admin users do not support 'traffic-limit'")
-            
-            # Check if user already exists
-            if AdminUser.objects.filter(username=username).exists():
-                raise CommandError(f'Admin user "{username}" already exists')
+        # Validate Admin user specific constraints
+        if options.get('clear_text_password'):
+            raise CommandError("Admin users cannot have clear text passwords")
+        
+        if options.get('max_sessions') != 1:
+            raise CommandError("Admin users do not support 'max-sessions'")
+        
+        if options.get('expires'):
+            raise CommandError("Admin users do not support 'expires'")
+        
+        if options.get('inactive'):
+            raise CommandError("Admin users do not support 'inactive' flag during creation")
+        
+        if options.get('notes'):
+            raise CommandError("Admin users do not support 'notes'")
+        
+        if options.get('traffic_limit'):
+            raise CommandError("Admin users do not support 'traffic-limit'")
+        
+        # Check if user already exists
+        if AdminUser.objects.filter(username=username).exists():
+            raise CommandError(f'Admin user "{username}" already exists')
 
-            # Create Admin user
-            AdminUser.objects.create_superuser(username=username, password=password)
-            self.stdout.write(self.style.SUCCESS(f'Successfully created admin user "{username}"'))
-            return
+        # Create Admin user
+        AdminUser.objects.create_superuser(username=username, password=password)  # type: ignore
+        self.stdout.write(self.style.SUCCESS(f'Successfully created admin user "{username}"'))
+
+    def _create_radius_user(self, options):
+        """Helper to create a RADIUS user."""
+        username = options['username']
+        password = options['password']
 
         # Radius User Creation Logic
         use_cleartext = options.get('clear_text_password')
@@ -337,51 +347,57 @@ class Command(BaseCommand):
 
     def update_user(self, options):
         """Update a user (Radius or Admin)."""
-        username = options['username']
-
         if options.get('admin_user'):
-            try:
-                user = AdminUser.objects.get(username=username)
-            except AdminUser.DoesNotExist:
-                raise CommandError(f'Admin user "{username}" not found')
+            self._update_admin_user(options)
+        else:
+            self._update_radius_user(options)
 
-            # Validate incompatible options
-            if options.get('clear_text_password'):
-                raise CommandError("Admin users cannot have clear text passwords")
-            if options.get('max_sessions'):
-                raise CommandError("Admin users do not support 'max-sessions'")
-            if options.get('expires'):
-                 raise CommandError("Admin users do not support 'expires'")
-            if options.get('notes'):
-                 raise CommandError("Admin users do not support 'notes'")
-            if options.get('traffic_limit'):
-                 raise CommandError("Admin users do not support 'traffic-limit'")
-            
-            updated = False
-            # Password Update
-            if options.get('password'):
-                 user.set_password(options['password'])
-                 self.stdout.write('Password updated')
-                 updated = True
-            
-            # Status Update
-            if options.get('active'):
-                 user.is_active = True
-                 self.stdout.write('User activated')
-                 updated = True
-            elif options.get('inactive'):
-                 user.is_active = False
-                 self.stdout.write('User deactivated')
-                 updated = True
-            
-            if updated:
-                 user.save()
-                 self.stdout.write(self.style.SUCCESS(f'Successfully updated admin user "{username}"'))
-            else:
-                 self.stdout.write('No changes made')
-            return
+    def _update_admin_user(self, options):
+        """Helper to update an Admin user."""
+        username = options['username']
+        try:
+            user = AdminUser.objects.get(username=username)
+        except AdminUser.DoesNotExist:
+            raise CommandError(f'Admin user "{username}" not found')
 
-        # Radius User Update Logic
+        # Validate incompatible options
+        if options.get('clear_text_password'):
+            raise CommandError("Admin users cannot have clear text passwords")
+        if options.get('max_sessions'):
+            raise CommandError("Admin users do not support 'max-sessions'")
+        if options.get('expires'):
+             raise CommandError("Admin users do not support 'expires'")
+        if options.get('notes'):
+             raise CommandError("Admin users do not support 'notes'")
+        if options.get('traffic_limit'):
+             raise CommandError("Admin users do not support 'traffic-limit'")
+        
+        updated = False
+        # Password Update
+        if options.get('password'):
+             user.set_password(options['password'])
+             self.stdout.write('Password updated')
+             updated = True
+        
+        # Status Update
+        if options.get('active'):
+             user.is_active = True
+             self.stdout.write('User activated')
+             updated = True
+        elif options.get('inactive'):
+             user.is_active = False
+             self.stdout.write('User deactivated')
+             updated = True
+        
+        if updated:
+             user.save()
+             self.stdout.write(self.style.SUCCESS(f'Successfully updated admin user "{username}"'))
+        else:
+             self.stdout.write('No changes made')
+
+    def _update_radius_user(self, options):
+        """Helper to update a RADIUS user."""
+        username = options['username']
         try:
             user = RadiusUser.objects.get(username=username)
         except RadiusUser.DoesNotExist:
