@@ -2,3 +2,6 @@ Django>=6.0
 pyrad>=2.4
 bcrypt>=4.0
 python-dotenv>=1.0.0
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers

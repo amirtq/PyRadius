@@ -6,8 +6,48 @@ and settings for RADIUS authentication.
 """
 
 from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
 import bcrypt
+
+class AdminUserManager(BaseUserManager):
+    def create_user(self, username, password=None, **extra_fields):
+        if not username:
+            raise ValueError('The Username field must be set')
+        user = self.model(username=username, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(username, password, **extra_fields)
+
+class AdminUser(AbstractBaseUser, PermissionsMixin):
+    """
+    Model representing an Admin user for the system (accessing the API).
+    Stored in radius_admins table.
+    """
+    username = models.CharField(max_length=255, unique=True)
+    token = models.CharField(max_length=255, blank=True, null=True, help_text="Optional static token or API key")
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = AdminUserManager()
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = []
+
+    class Meta:
+        db_table = 'radius_admins'
+        verbose_name = 'Admin User'
+        verbose_name_plural = 'Admin Users'
+
+    def __str__(self):
+        return self.username
 
 class RadiusUser(models.Model):
     """
