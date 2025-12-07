@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/client';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../components/Modal';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -14,18 +20,40 @@ const Users = () => {
     is_active: true,
     allowed_traffic: '',
     expiration_date: '',
-    use_cleartext_password: false
+    use_cleartext_password: false,
+    notes: ''
   });
   const [error, setError] = useState('');
 
+  // Debounce search query
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1); // Reset to page 1 on search change
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [page, pageSize, debouncedSearch]);
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/radius-users/');
+      const params = {
+        page: page,
+        page_size: pageSize,
+      };
+      if (debouncedSearch) {
+        params.search = debouncedSearch;
+      }
+
+      const response = await api.get('/radius-users/', { params });
       setUsers(response.data.results);
+      setTotalCount(response.data.count);
     } catch (error) {
       console.error(error);
     }
@@ -40,7 +68,8 @@ const Users = () => {
       is_active: true,
       allowed_traffic: '',
       expiration_date: '',
-      use_cleartext_password: false
+      use_cleartext_password: false,
+      notes: ''
     });
     setIsAddModalOpen(true);
   };
@@ -54,7 +83,8 @@ const Users = () => {
       is_active: user.is_active,
       allowed_traffic: user.allowed_traffic ? (user.allowed_traffic / (1024 * 1024)).toString() : '',
       expiration_date: user.expiration_date ? user.expiration_date.substring(0, 16) : '', // Format for datetime-local
-      use_cleartext_password: false
+      use_cleartext_password: false,
+      notes: user.notes || ''
     });
     setIsAddModalOpen(true);
   };
@@ -96,17 +126,53 @@ const Users = () => {
     }));
   };
 
+  const totalPages = Math.ceil(totalCount / pageSize);
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-slate-100">Radius Users</h2>
-        <button 
-            onClick={openAddModal}
-            className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-400 shadow-sm shadow-sky-500/30 transition-all font-medium"
-        >
-            <Plus className="w-5 h-5 mr-2" />
-            Add User
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <div className="relative flex-grow sm:flex-grow-0">
+             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-slate-400" />
+             </div>
+             <input
+                type="text"
+                className="block w-full pl-10 pr-3 py-2 border border-slate-700 rounded-md leading-5 bg-slate-900 text-slate-300 placeholder-slate-400 focus:outline-none focus:bg-slate-900 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+             />
+          </div>
+          <button 
+              onClick={openAddModal}
+              className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-400 shadow-sm shadow-sky-500/30 transition-all font-medium whitespace-nowrap"
+          >
+              <Plus className="w-5 h-5 mr-2" />
+              Add User
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 flex items-center justify-between">
+         <div className="flex items-center text-sm text-slate-400">
+             <span className="mr-2">Show</span>
+             <select
+                value={pageSize}
+                onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                }}
+                className="bg-slate-900 border border-slate-700 text-slate-300 rounded focus:ring-sky-500 focus:border-sky-500 p-1"
+             >
+                 <option value={10}>10</option>
+                 <option value={20}>20</option>
+                 <option value={50}>50</option>
+                 <option value={100}>100</option>
+             </select>
+             <span className="ml-2">entries</span>
+         </div>
       </div>
 
       <Modal
@@ -132,6 +198,19 @@ const Users = () => {
                 className="block w-full rounded-md border-slate-700 bg-slate-900 text-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm border p-2"
                 value={formData.username}
                 onChange={handleChange}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="notes" className="block text-sm font-medium text-slate-400 mb-1">Description (Notes)</label>
+              <textarea
+                id="notes"
+                name="notes"
+                rows="2"
+                className="block w-full rounded-md border-slate-700 bg-slate-900 text-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm border p-2"
+                value={formData.notes}
+                onChange={handleChange}
+                placeholder="Optional description or notes"
               />
             </div>
 
@@ -241,6 +320,7 @@ const Users = () => {
           <thead className="bg-slate-900/50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Username</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Description</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Sessions</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Traffic</th>
@@ -248,34 +328,72 @@ const Users = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50 bg-slate-800">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-slate-700/30 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">{user.username}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
-                        user.status === 'OK' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                        user.status === 'Expired' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                        user.status === 'OverQuota' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                        'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                    }`}>
-                        {user.status === 'OK' ? 'Active' : user.status}
-                    </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{user.current_sessions} / {user.max_concurrent_sessions}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{(user.total_traffic / 1024 / 1024).toFixed(2)} MB</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                  <button 
-                    onClick={() => openEditModal(user)}
-                    className="text-sky-400 hover:text-sky-300 transition-colors" 
-                    title="Edit"
-                  >
-                    <Pencil className="w-5 h-5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {users.length > 0 ? (
+                users.map((user) => (
+                <tr key={user.id} className="hover:bg-slate-700/30 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">{user.username}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 max-w-xs truncate" title={user.notes}>
+                        {user.notes || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                            user.status === 'OK' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                            user.status === 'Expired' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                            user.status === 'OverQuota' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                        }`}>
+                            {user.status === 'OK' ? 'Active' : user.status}
+                        </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{user.current_sessions} / {user.max_concurrent_sessions}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{(user.total_traffic / 1024 / 1024).toFixed(2)} MB</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                    <button 
+                        onClick={() => openEditModal(user)}
+                        className="text-sky-400 hover:text-sky-300 transition-colors" 
+                        title="Edit"
+                    >
+                        <Pencil className="w-5 h-5" />
+                    </button>
+                    </td>
+                </tr>
+                ))
+            ) : (
+                <tr>
+                    <td colSpan="6" className="px-6 py-8 text-center text-slate-500 italic">
+                        No users found.
+                    </td>
+                </tr>
+            )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-slate-400">
+              Showing <span className="font-medium">{Math.min((page - 1) * pageSize + 1, totalCount)}</span> to <span className="font-medium">{Math.min(page * pageSize, totalCount)}</span> of <span className="font-medium">{totalCount}</span> results
+          </div>
+          <div className="flex bg-slate-800 rounded-md shadow-sm">
+              <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-700 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                  <ChevronLeft className="h-5 w-5" />
+              </button>
+              {/* Simplified Page Numbers Logic - Just current page context */}
+              <div className="relative inline-flex items-center px-4 py-2 border-t border-b border-slate-700 bg-slate-800 text-sm font-medium text-slate-200">
+                  Page {page} of {totalPages || 1}
+              </div>
+              <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-700 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                  <ChevronRight className="h-5 w-5" />
+              </button>
+          </div>
       </div>
     </div>
   );
