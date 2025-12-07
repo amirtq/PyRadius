@@ -4,12 +4,13 @@ from .models import AdminUser, RadiusUser
 class RadiusUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     use_cleartext_password = serializers.BooleanField(write_only=True, required=False, default=False)
+    status = serializers.CharField(source='status_label', read_only=True)
 
     class Meta:
         model = RadiusUser
         fields = (
             'id', 'username', 'password', 'use_cleartext_password', 'max_concurrent_sessions',
-            'expiration_date', 'is_active', 'notes',
+            'expiration_date', 'is_active', 'status', 'notes',
             'rx_traffic', 'tx_traffic', 'total_traffic',
             'allowed_traffic', 'current_sessions', 'remaining_sessions',
             'created_at', 'updated_at'

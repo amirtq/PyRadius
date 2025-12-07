@@ -253,11 +253,12 @@ const Users = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">{user.username}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
-                        user.is_active 
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                        : 'bg-red-500/10 text-red-400 border-red-500/20'
+                        user.status === 'OK' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        user.status === 'Expired' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                        user.status === 'OverQuota' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                        'bg-slate-500/10 text-slate-400 border-slate-500/20'
                     }`}>
-                        {user.is_active ? 'Active' : 'Inactive'}
+                        {user.status === 'OK' ? 'Active' : user.status}
                     </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{user.current_sessions} / {user.max_concurrent_sessions}</td>

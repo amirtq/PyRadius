@@ -172,6 +172,20 @@ class RadiusUser(models.Model):
             return False, "Traffic limit reached"
         return True, "OK"
     
+    @property
+    def status_label(self) -> str:
+        """
+        Get the status label for the user (Disabled, Expired, OverQuota, OK).
+        Using same logic as management command.
+        """
+        if not self.is_active:
+            return 'Disabled'
+        if self.is_expired():
+            return 'Expired'
+        if self.allowed_traffic is not None and self.total_traffic >= self.allowed_traffic:
+            return 'OverQuota'
+        return 'OK'
+
     def get_active_session_count(self) -> int:
         """
         Get the number of currently active sessions for this user.

@@ -502,13 +502,7 @@ class Command(BaseCommand):
 
     def _print_user_details(self, user):
         """Print detailed user information."""
-        status = 'OK'
-        if not user.is_active:
-            status = 'Disabled'
-        elif user.is_expired():
-            status = 'Expired'
-        elif user.allowed_traffic is not None and user.total_traffic >= user.allowed_traffic:
-            status = 'OverQuota'
+        status = user.status_label
         
         self.stdout.write(f"\nUser: {user.username}")
         self.stdout.write(f"  Status: {status}")
@@ -590,13 +584,7 @@ class Command(BaseCommand):
 
     def _print_user_row(self, user):
         """Print a single user row."""
-        status = 'OK'
-        if not user.is_active:
-            status = 'Disabled'
-        elif user.is_expired():
-            status = 'Expired'
-        elif user.allowed_traffic is not None and user.total_traffic >= user.allowed_traffic:
-            status = 'OverQuota'
+        status = user.status_label
         
         # Determine password display
         pwd_display = 'Encrypted'
