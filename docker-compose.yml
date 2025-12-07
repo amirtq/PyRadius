@@ -1,6 +1,7 @@
 services:
   radius:
     build: .
+    image: pyradius
     container_name: pyradius
     restart: always
     ports:
