@@ -11,14 +11,5 @@ services:
     volumes:
       - ./backend/db.sqlite3:/app/db.sqlite3
       - ./nginx/ssl:/etc/nginx/ssl
-    environment:
-      - SECRET_KEY=django-insecure-dev-key-change-this-in-prod-custom
-      - DEBUG=True
-      - AUTH_PORT=1812
-      - ACCT_PORT=1813
-      - BIND_ADDRESS=0.0.0.0
-      - LOG_LEVEL=DEBUG
-      - ACCT_INTERIM_INTERVAL=60
-      - RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT=1000
-      - RADIUS_LOG_RETENTION=1000
-      - SSL_DOMAIN=localhost
+    env_file:
+      - .env

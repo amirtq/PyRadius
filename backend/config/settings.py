@@ -12,19 +12,70 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file (project root is one level up from backend)
+ENV_FILE = BASE_DIR.parent / '.env'
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE)
+else:
+    # In production (Docker), env vars are already set via docker-compose env_file
+    # Only warn if running locally without .env
+    import sys
+    if 'runserver' in sys.argv or 'manage.py' in sys.argv[0]:
+        print(f"Warning: .env file not found at {ENV_FILE}")
+
+
+def get_env_variable(var_name, default=None, required=True, cast=None):
+    """
+    Get environment variable or raise exception if required and missing.
+    
+    Args:
+        var_name: Name of the environment variable
+        default: Default value if not required and missing
+        required: If True, raises ImproperlyConfigured when variable is missing
+        cast: Type to cast the value to (str, int, bool, etc.). None means str.
+    
+    Returns:
+        The environment variable value, cast to the specified type
+    
+    Raises:
+        ImproperlyConfigured: If required variable is missing
+    """
+    value = os.environ.get(var_name)
+    
+    if value is None:
+        if required and default is None:
+            raise ImproperlyConfigured(
+                f"Required environment variable '{var_name}' is not set. "
+                f"Please check your .env file at {ENV_FILE}"
+            )
+        value = default
+    
+    # Handle type casting
+    if value is not None:
+        if cast == bool:
+            return str(value).lower() in ('true', '1', 'yes')
+        elif cast == int:
+            return int(value)
+        elif cast is None or cast == str:
+            return str(value)
+        return cast(value)
+    return value
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-this-in-prod')
+SECRET_KEY = get_env_variable('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = get_env_variable('DEBUG', cast=bool)
 
 ALLOWED_HOSTS = ['*']
 
@@ -149,25 +200,25 @@ SIMPLE_JWT = {
 
 RADIUS_CONFIG = {
     # Authentication port (RFC 2865)
-    'AUTH_PORT': int(os.environ.get('AUTH_PORT', 1812)),
+    'AUTH_PORT': get_env_variable('AUTH_PORT', cast=int),
     # Accounting port (RFC 2866)
-    'ACCT_PORT': int(os.environ.get('ACCT_PORT', 1813)),
+    'ACCT_PORT': get_env_variable('ACCT_PORT', cast=int),
     # Server bind address (0.0.0.0 for all interfaces)
-    'BIND_ADDRESS': os.environ.get('BIND_ADDRESS', '0.0.0.0'),
+    'BIND_ADDRESS': get_env_variable('BIND_ADDRESS'),
     # Logging level
-    'LOG_LEVEL': os.environ.get('LOG_LEVEL', 'DEBUG'),
+    'LOG_LEVEL': get_env_variable('LOG_LEVEL'),
     # Path to RADIUS dictionary file
     'DICTIONARY_PATH': BASE_DIR / 'radius' / 'dictionary',
-    # Accounting interim interval (RFC 2869) - default 600s/10m
-    'ACCT_INTERIM_INTERVAL': int(os.environ.get('ACCT_INTERIM_INTERVAL', 600)),
+    # Accounting interim interval (RFC 2869)
+    'ACCT_INTERIM_INTERVAL': get_env_variable('ACCT_INTERIM_INTERVAL', cast=int),
     # Max inactive sessions to retain in DB
-    'MAX_INACTIVE_SESSIONS': int(os.environ.get('RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT', 100)),
+    'MAX_INACTIVE_SESSIONS': get_env_variable('RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT', cast=int),
     # Multiplier for ACCT_INTERIM_INTERVAL to consider a session dead/stale
-    'STALE_SESSION_MULTIPLIER': int(os.environ.get('RADIUS_STALE_SESSION_MULTIPLIER', 5)),
+    'STALE_SESSION_MULTIPLIER': get_env_variable('RADIUS_STALE_SESSION_MULTIPLIER', cast=int),
 }
 
 # Logging Configuration
-RADIUS_LOG_RETENTION = int(os.environ.get('RADIUS_LOG_RETENTION', 1000))
+RADIUS_LOG_RETENTION = get_env_variable('RADIUS_LOG_RETENTION', cast=int)
 
 LOGGING = {
     'version': 1,
@@ -183,6 +234,6 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console', 'db_log'],
-        'level': os.environ.get('LOG_LEVEL', 'DEBUG'),
+        'level': get_env_variable('LOG_LEVEL'),
     },
 }
