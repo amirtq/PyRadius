@@ -3,11 +3,12 @@ from .models import AdminUser, RadiusUser
 
 class RadiusUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    use_cleartext_password = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = RadiusUser
         fields = (
-            'id', 'username', 'password', 'max_concurrent_sessions',
+            'id', 'username', 'password', 'use_cleartext_password', 'max_concurrent_sessions',
             'expiration_date', 'is_active', 'notes',
             'rx_traffic', 'tx_traffic', 'total_traffic',
             'allowed_traffic', 'current_sessions', 'remaining_sessions',
@@ -21,21 +22,23 @@ class RadiusUserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
+        use_cleartext = validated_data.pop('use_cleartext_password', False)
         user = RadiusUser(**validated_data)
         if password:
-            user.set_password(password)
+            user.set_password(password, use_cleartext=use_cleartext)
         user.save()
         return user
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
+        use_cleartext = validated_data.pop('use_cleartext_password', False)
         
         # Helper to avoid error if set_password called
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
             
         if password:
-            instance.set_password(password)
+            instance.set_password(password, use_cleartext=use_cleartext)
             
         instance.save()
         return instance

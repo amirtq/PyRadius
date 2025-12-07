@@ -21,18 +21,18 @@ const Layout = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-slate-900 text-slate-200">
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>
+        <div className="fixed inset-0 z-40 bg-slate-900/80 backdrop-blur-sm md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex justify-between items-center p-6">
-          <h1 className="text-2xl font-bold text-indigo-600">PyRadius</h1>
+          <h1 className="text-2xl font-bold text-sky-400 tracking-tight">PyRadius</h1>
           <button className="md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
-            <X className="w-6 h-6 text-gray-600" />
+            <X className="w-6 h-6 text-slate-400" />
           </button>
         </div>
         <nav className="mt-2 space-y-1">
@@ -42,20 +42,26 @@ const Layout = () => {
               to={item.path}
               onClick={() => setIsMobileMenuOpen(false)}
               className={({ isActive }) =>
-                `flex items-center px-6 py-3 text-gray-700 transition-colors ${
-                  isActive ? 'bg-indigo-50 text-indigo-600 border-r-4 border-indigo-600' : 'hover:bg-gray-50'
+                `flex items-center px-6 py-3 transition-colors ${
+                  isActive 
+                    ? 'bg-slate-800/50 text-sky-400 border-r-2 border-sky-400' 
+                    : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200'
                 }`
               }
             >
-              <item.icon className="w-5 h-5 mr-3" />
-              {item.name}
+              {({ isActive }) => (
+                <>
+                  <item.icon className={`w-5 h-5 mr-3 ${isActive ? 'text-sky-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                  {item.name}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200 bg-white">
+        <div className="absolute bottom-0 w-64 p-4 border-t border-slate-800 bg-slate-900">
            <button
             onClick={handleLogout}
-            className="flex items-center px-4 py-2 text-sm font-medium text-red-600 rounded-md hover:bg-red-50 w-full"
+            className="flex items-center px-4 py-2 text-sm font-medium text-red-400 rounded-md hover:bg-slate-800 w-full transition-colors"
           >
             <LogOut className="w-5 h-5 mr-3" />
             Sign Out
@@ -64,14 +70,14 @@ const Layout = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-slate-900">
         {/* Mobile Header */}
-        <header className="bg-white shadow md:hidden z-10">
+        <header className="bg-slate-900 border-b border-slate-800 md:hidden z-10">
             <div className="px-4 py-4 flex justify-between items-center">
-                <button onClick={() => setIsMobileMenuOpen(true)} className="text-gray-500 focus:outline-none">
+                <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-400 hover:text-white focus:outline-none">
                     <Menu className="w-6 h-6" />
                 </button>
-                <div className="text-lg font-semibold text-gray-700">PyRadius</div>
+                <div className="text-lg font-semibold text-sky-400">PyRadius</div>
                 <div className="w-6"></div>
             </div>
         </header>
