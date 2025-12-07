@@ -163,6 +163,8 @@ RADIUS_CONFIG = {
     'ACCT_INTERIM_INTERVAL': int(os.environ.get('ACCT_INTERIM_INTERVAL', 600)),
     # Max inactive sessions to retain in DB
     'MAX_INACTIVE_SESSIONS': int(os.environ.get('RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT', 100)),
+    # Multiplier for ACCT_INTERIM_INTERVAL to consider a session dead/stale
+    'STALE_SESSION_MULTIPLIER': int(os.environ.get('RADIUS_STALE_SESSION_MULTIPLIER', 5)),
 }
 
 # Logging Configuration

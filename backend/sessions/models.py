@@ -5,8 +5,12 @@ This module defines the RadiusSession model for tracking active and
 historical VPN sessions for concurrent connection control.
 """
 
+import logging
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 class RadiusSession(models.Model):
     """
@@ -85,6 +89,10 @@ class RadiusSession(models.Model):
     start_time = models.DateTimeField(
         default=timezone.now,
         help_text="When the session started"
+    )
+    last_updated = models.DateTimeField(
+        default=timezone.now,
+        help_text="Last time the session was updated"
     )
     stop_time = models.DateTimeField(
         null=True,
@@ -248,6 +256,7 @@ class RadiusSession(models.Model):
         if output_packets is not None:
             self.output_packets = output_packets
         
+        self.last_updated = timezone.now()
         self.save()
     
     @classmethod
@@ -330,6 +339,55 @@ class RadiusSession(models.Model):
             
             # Delete sessions that are NOT in the keep list
             cls.objects.filter(status=cls.STATUS_STOPPED).exclude(id__in=keep_ids).delete()
+
+    @classmethod
+    def cleanup_dead_sessions(cls) -> int:
+        """
+        Clean up dead active sessions that haven't received updates for too long.
+        Expiration = ACCT_INTERIM_INTERVAL * STALE_SESSION_MULTIPLIER
+        """
+        interim_interval = settings.RADIUS_CONFIG.get('ACCT_INTERIM_INTERVAL', 600)
+        multiplier = settings.RADIUS_CONFIG.get('STALE_SESSION_MULTIPLIER', 5)
+        
+        # Calculate max allowed silence duration
+        max_silence = interim_interval * multiplier
+        
+        cutoff_time = timezone.now() - timezone.timedelta(seconds=max_silence)
+        
+        # Find active sessions not updated since cutoff
+        dead_sessions = cls.objects.filter(
+            status=cls.STATUS_ACTIVE,
+            last_updated__lt=cutoff_time
+        )
+        
+        count = dead_sessions.count()
+        if count > 0:
+            logger.info(f"Found {count} dead sessions (no update since {cutoff_time})")
+            
+            # Process each session to ensure proper stop logic runs (updates user stats if needed)
+            # Although bulk update is faster, stop_session handles traffic stats reconciliation better
+            # However, for dead sessions, we assume no new traffic was reported.
+            # We'll use bulk update for efficiency but we must update user counts.
+            
+            affected_users = set(dead_sessions.values_list('username', flat=True))
+            
+            # Mark them as stopped with Lost-Carrier cause
+            dead_sessions.update(
+                status=cls.STATUS_STOPPED,
+                stop_time=timezone.now(),
+                terminate_cause=cls.TERMINATE_CAUSE_LOST_CARRIER
+            )
+            
+            # Update counts for affected users
+            from users.models import RadiusUser
+            for username in affected_users:
+                try:
+                    user = RadiusUser.objects.get(username=username)
+                    user.update_session_counts()
+                except RadiusUser.DoesNotExist:
+                    pass
+                    
+        return count
 
     @classmethod
     def cleanup_stale_sessions(cls, max_age_hours: int = 24) -> int:

@@ -203,6 +203,8 @@ class Command(BaseCommand):
         self.stdout.write(f"  Framed IP Address: {session.framed_ip_address or 'N/A'}")
         self.stdout.write(f"  Calling Station ID: {session.calling_station_id or 'N/A'}")
         self.stdout.write(f"  Start Time: {session.start_time}")
+        if session.last_updated:
+            self.stdout.write(f"  Last Updated: {session.last_updated}")
         if session.stop_time:
             self.stdout.write(f"  Stop Time: {session.stop_time}")
         self.stdout.write(f"  Session Time: {self._format_duration(session.session_time)}")
@@ -254,9 +256,9 @@ class Command(BaseCommand):
         """Print the header for session list."""
         self.stdout.write(
             f"{'Session ID':<20} {'Username':<15} {'Client IP':<15} {'MAC':<17} "
-            f"{'NAS':<10} {'Status':<10} {'In':<10} {'Out':<10} {'Started':<20}"
+            f"{'NAS':<10} {'Status':<10} {'In':<10} {'Out':<10} {'Started':<20} {'Last Updated':<20}"
         )
-        self.stdout.write("-" * 130)
+        self.stdout.write("-" * 150)
 
     def _print_session_row(self, session):
         """Print a single session row."""
@@ -264,6 +266,11 @@ class Command(BaseCommand):
             started = session.start_time.strftime('%Y-%m-%d %H:%M:%S')
         else:
             started = 'N/A'
+            
+        if session.last_updated:
+            last_upd = session.last_updated.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            last_upd = 'N/A'
         
         sid = str(session.session_id or 'N/A')
         username = str(session.username or 'N/A')
@@ -277,5 +284,5 @@ class Command(BaseCommand):
         self.stdout.write(
             f"{sid[:20]:<20} {username:<15} {client_ip:<15} {mac[:17]:<17} "
             f"{nas[:10]:<10} {session.status:<10} "
-            f"{input_data:<10} {output_data:<10} {started:<20}"
+            f"{input_data:<10} {output_data:<10} {started:<20} {last_upd:<20}"
         )

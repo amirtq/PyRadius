@@ -24,7 +24,12 @@ const Layout = () => {
     <div className="flex h-screen bg-slate-900 text-slate-200">
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-slate-900/80 backdrop-blur-sm md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>
+        <button 
+          type="button"
+          className="fixed inset-0 z-40 bg-slate-900/80 backdrop-blur-sm md:hidden w-full h-full cursor-default" 
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-label="Close mobile menu"
+        ></button>
       )}
 
       {/* Sidebar */}

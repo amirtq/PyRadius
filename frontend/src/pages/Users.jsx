@@ -65,7 +65,7 @@ const Users = () => {
     try {
       const userPayload = {
         ...formData,
-        allowed_traffic: formData.allowed_traffic ? parseInt(formData.allowed_traffic) * 1024 * 1024 : null,
+        allowed_traffic: formData.allowed_traffic ? Number.parseInt(formData.allowed_traffic) * 1024 * 1024 : null,
         expiration_date: formData.expiration_date || null
       };
 
@@ -123,8 +123,9 @@ const Users = () => {
             )}
             
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Username</label>
+              <label htmlFor="username" className="block text-sm font-medium text-slate-400 mb-1">Username</label>
               <input
+                id="username"
                 type="text"
                 name="username"
                 required
@@ -135,10 +136,11 @@ const Users = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-400 mb-1">
                 Password {editingUser && <span className="text-slate-500 font-normal">(leave blank to keep current)</span>}
               </label>
               <input
+                id="password"
                 type="password"
                 name="password"
                 required={!editingUser}
@@ -163,8 +165,9 @@ const Users = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Quota (MB)</label>
+              <label htmlFor="allowed_traffic" className="block text-sm font-medium text-slate-400 mb-1">Quota (MB)</label>
               <input
+                id="allowed_traffic"
                 type="number"
                 name="allowed_traffic"
                 min="0"
@@ -176,8 +179,9 @@ const Users = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Expiration Date</label>
+              <label htmlFor="expiration_date" className="block text-sm font-medium text-slate-400 mb-1">Expiration Date</label>
               <input
+                id="expiration_date"
                 type="datetime-local"
                 name="expiration_date"
                 className="block w-full rounded-md border-slate-700 bg-slate-900 text-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm border p-2 [color-scheme:dark]"
@@ -187,8 +191,9 @@ const Users = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Max Concurrent Sessions</label>
+              <label htmlFor="max_concurrent_sessions" className="block text-sm font-medium text-slate-400 mb-1">Max Concurrent Sessions</label>
               <input
+                id="max_concurrent_sessions"
                 type="number"
                 name="max_concurrent_sessions"
                 min="1"

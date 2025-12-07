@@ -81,6 +81,13 @@ class AccountingHandler:
         Returns:
             Accounting-Response packet
         """
+        # Clean up dead sessions on every accounting packet
+        try:
+            from sessions.models import RadiusSession
+            RadiusSession.cleanup_dead_sessions()
+        except Exception as e:
+            logger.error(f"Error cleaning dead sessions: {e}")
+
         # Extract common attributes
         acct_status_type = self._get_int_attribute(pkt, 'Acct-Status-Type', ACCT_STATUS_MAP)
         session_id = self._get_attribute(pkt, 'Acct-Session-Id')
