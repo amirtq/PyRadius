@@ -6,3 +6,4 @@ djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
 django-filter
+apscheduler>=3.10.0

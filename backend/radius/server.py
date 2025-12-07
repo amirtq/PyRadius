@@ -251,6 +251,14 @@ def run_server(auth_port=1812, acct_port=1813, bind_address='0.0.0.0', log_level
     # Set up Django
     setup_django()
     
+    # Start the statistics scheduler
+    try:
+        from stats.scheduler import start_scheduler
+        start_scheduler()
+        logger.info("Statistics scheduler started")
+    except Exception as e:
+        logger.warning(f"Could not start statistics scheduler: {e}")
+    
     logger.info("Starting RADIUS Server...")
     
     # Create and run the server

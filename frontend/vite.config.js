@@ -8,6 +8,7 @@ export default defineConfig({
   build: {
     outDir: '../backend/frontend_dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     proxy: {

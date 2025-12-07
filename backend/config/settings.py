@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     'nas',
     'sessions',
     'radius',
+    'stats',
 ]
 
 MIDDLEWARE = [
@@ -215,6 +216,21 @@ RADIUS_CONFIG = {
     'MAX_INACTIVE_SESSIONS': get_env_variable('RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT', cast=int),
     # Multiplier for ACCT_INTERIM_INTERVAL to consider a session dead/stale
     'STALE_SESSION_MULTIPLIER': get_env_variable('RADIUS_STALE_SESSION_MULTIPLIER', cast=int),
+}
+
+# =============================================================================
+# Statistics Configuration
+# =============================================================================
+
+STATS_CONFIG = {
+    # Interval for saving server-wide active sessions stats (in seconds)
+    'SERVER_SESSIONS_INTERVAL': get_env_variable('STATS_SERVER_SESSIONS_INTERVAL', default=300, required=False, cast=int),
+    # Interval for saving server-wide traffic stats (in seconds)
+    'SERVER_TRAFFIC_INTERVAL': get_env_variable('STATS_SERVER_TRAFFIC_INTERVAL', default=300, required=False, cast=int),
+    # Interval for saving per-user active sessions stats (in seconds)
+    'USERS_SESSIONS_INTERVAL': get_env_variable('STATS_USERS_SESSIONS_INTERVAL', default=300, required=False, cast=int),
+    # Interval for saving per-user traffic stats (in seconds)
+    'USERS_TRAFFIC_INTERVAL': get_env_variable('STATS_USERS_TRAFFIC_INTERVAL', default=300, required=False, cast=int),
 }
 
 # Logging Configuration
