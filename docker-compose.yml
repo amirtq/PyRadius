@@ -4,11 +4,13 @@ services:
     container_name: pyradius
     restart: always
     ports:
-      - "80:8000"
+      - "80:80"
+      - "443:443"
       - "1812:1812/udp"
       - "1813:1813/udp"
     volumes:
       - ./backend/db.sqlite3:/app/db.sqlite3
+      - ./nginx/ssl:/etc/nginx/ssl
     environment:
       - SECRET_KEY=django-insecure-dev-key-change-this-in-prod-custom
       - DEBUG=True
@@ -19,3 +21,4 @@ services:
       - ACCT_INTERIM_INTERVAL=60
       - RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT=1000
       - RADIUS_LOG_RETENTION=1000
+      - SSL_DOMAIN=localhost

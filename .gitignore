@@ -4,3 +4,8 @@ __pycache__/
 *$py.class
 backend/db.sqlite3
 backend/frontend_dist/
+
+# Nginx SSL certificates (keep .gitkeep)
+nginx/ssl/*.crt
+nginx/ssl/*.key
+nginx/ssl/*.pem

@@ -1,0 +1,5 @@
+# This file ensures the ssl directory is tracked in git.
+# Place your custom SSL certificates here:
+#   - server.crt (certificate file)
+#   - server.key (private key file)
+# If no certificates are found, self-signed ones will be generated automatically.
