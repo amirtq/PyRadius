@@ -1,7 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/client';
-import { Plus, Pencil, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../components/Modal';
+
+const formatTraffic = (bytes) => {
+  if (bytes === null || bytes === undefined) return '0.00 MB';
+  
+  const mb = 1024 * 1024;
+  const gb = 1024 * 1024 * 1024;
+  const tb = 1024 * 1024 * 1024 * 1024;
+
+  if (bytes < gb) {
+    return `${(bytes / mb).toFixed(2)} MB`;
+  } else if (bytes < tb) {
+    return `${(bytes / gb).toFixed(2)} GB`;
+  } else {
+    return `${(bytes / tb).toFixed(2)} TB`;
+  }
+};
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -89,6 +105,21 @@ const Users = () => {
     setIsAddModalOpen(true);
   };
 
+  const handleDelete = async () => {
+    if (!editingUser) return;
+    
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      try {
+        await api.delete(`/radius-users/${editingUser.id}/`);
+        setIsAddModalOpen(false);
+        fetchUsers();
+      } catch (error) {
+        console.error(error);
+        setError('Failed to delete user. Please try again.');
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -126,6 +157,19 @@ const Users = () => {
     }));
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'OK':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'Expired':
+        return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+      case 'OverQuota':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      default:
+        return 'bg-slate-500/10 text-slate-300 border-slate-500/20';
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
@@ -135,11 +179,11 @@ const Users = () => {
         <div className="flex gap-2 w-full sm:w-auto">
           <div className="relative flex-grow sm:flex-grow-0">
              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-slate-400" />
+                <Search className="h-5 w-5 text-slate-300" />
              </div>
              <input
                 type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-slate-700 rounded-md leading-5 bg-slate-900 text-slate-300 placeholder-slate-400 focus:outline-none focus:bg-slate-900 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-slate-700 rounded-md leading-5 bg-slate-900 text-slate-200 placeholder-slate-400 focus:outline-none focus:bg-slate-900 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                 placeholder="Search users..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -156,7 +200,7 @@ const Users = () => {
       </div>
 
       <div className="mb-4 flex items-center justify-between">
-         <div className="flex items-center text-sm text-slate-400">
+         <div className="flex items-center text-sm text-slate-300">
              <span className="mr-2">Show</span>
              <select
                 value={pageSize}
@@ -164,7 +208,7 @@ const Users = () => {
                     setPageSize(Number(e.target.value));
                     setPage(1);
                 }}
-                className="bg-slate-900 border border-slate-700 text-slate-300 rounded focus:ring-sky-500 focus:border-sky-500 p-1"
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded focus:ring-sky-500 focus:border-sky-500 p-1"
              >
                  <option value={10}>10</option>
                  <option value={20}>20</option>
@@ -189,7 +233,7 @@ const Users = () => {
             )}
             
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-slate-400 mb-1">Username</label>
+              <label htmlFor="username" className="block text-sm font-medium text-slate-300 mb-1">Username</label>
               <input
                 id="username"
                 type="text"
@@ -202,7 +246,7 @@ const Users = () => {
             </div>
 
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-slate-400 mb-1">Description (Notes)</label>
+              <label htmlFor="notes" className="block text-sm font-medium text-slate-300 mb-1">Description (Notes)</label>
               <textarea
                 id="notes"
                 name="notes"
@@ -215,8 +259,8 @@ const Users = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-400 mb-1">
-                Password {editingUser && <span className="text-slate-500 font-normal">(leave blank to keep current)</span>}
+              <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
+                Password {editingUser && <span className="text-slate-400 font-normal">(leave blank to keep current)</span>}
               </label>
               <input
                 id="password"
@@ -238,13 +282,13 @@ const Users = () => {
                 checked={formData.use_cleartext_password}
                 onChange={handleChange}
               />
-              <label htmlFor="use_cleartext_password" className="ml-2 block text-sm text-slate-300">
+              <label htmlFor="use_cleartext_password" className="ml-2 block text-sm text-slate-200">
                 Store as Clear Text Password
               </label>
             </div>
 
             <div>
-              <label htmlFor="allowed_traffic" className="block text-sm font-medium text-slate-400 mb-1">Quota (MB)</label>
+              <label htmlFor="allowed_traffic" className="block text-sm font-medium text-slate-300 mb-1">Quota (MB)</label>
               <input
                 id="allowed_traffic"
                 type="number"
@@ -258,7 +302,7 @@ const Users = () => {
             </div>
 
             <div>
-              <label htmlFor="expiration_date" className="block text-sm font-medium text-slate-400 mb-1">Expiration Date</label>
+              <label htmlFor="expiration_date" className="block text-sm font-medium text-slate-300 mb-1">Expiration Date</label>
               <input
                 id="expiration_date"
                 type="datetime-local"
@@ -270,7 +314,7 @@ const Users = () => {
             </div>
 
             <div>
-              <label htmlFor="max_concurrent_sessions" className="block text-sm font-medium text-slate-400 mb-1">Max Concurrent Sessions</label>
+              <label htmlFor="max_concurrent_sessions" className="block text-sm font-medium text-slate-300 mb-1">Max Concurrent Sessions</label>
               <input
                 id="max_concurrent_sessions"
                 type="number"
@@ -292,25 +336,37 @@ const Users = () => {
                 checked={formData.is_active}
                 onChange={handleChange}
               />
-              <label htmlFor="is_active" className="ml-2 block text-sm text-slate-300">
+              <label htmlFor="is_active" className="ml-2 block text-sm text-slate-200">
                 Active
               </label>
             </div>
 
-            <div className="mt-5 sm:mt-6 sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-3">
-              <button
-                type="submit"
-                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-sky-500 text-base font-medium text-white hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:col-start-2 sm:text-sm"
-              >
-                {editingUser ? "Update" : "Create"}
-              </button>
-              <button
-                type="button"
-                className="mt-3 w-full inline-flex justify-center rounded-md border border-slate-600 shadow-sm px-4 py-2 bg-slate-800 text-base font-medium text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:col-start-1 sm:text-sm"
-                onClick={() => setIsAddModalOpen(false)}
-              >
-                Cancel
-              </button>
+            <div className="mt-5 sm:mt-6 space-y-3">
+              <div className="sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-3">
+                <button
+                  type="submit"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-sky-500 text-base font-medium text-white hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:col-start-2 sm:text-sm"
+                >
+                  {editingUser ? "Update" : "Create"}
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-slate-600 shadow-sm px-4 py-2 bg-slate-800 text-base font-medium text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  onClick={() => setIsAddModalOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+              
+              {editingUser && (
+                 <button
+                   type="button"
+                   onClick={handleDelete}
+                   className="w-full inline-flex justify-center rounded-md border border-red-500/30 shadow-sm px-4 py-2 bg-red-500/10 text-base font-medium text-red-400 hover:bg-red-500/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm transition-colors"
+                 >
+                   Delete User
+                 </button>
+              )}
             </div>
           </div>
         </form>
@@ -319,48 +375,42 @@ const Users = () => {
         <table className="min-w-full divide-y divide-slate-700/50">
           <thead className="bg-slate-900/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Username</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Description</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Sessions</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Traffic</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Username</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Description</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Sessions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Traffic</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50 bg-slate-800">
             {users.length > 0 ? (
                 users.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-700/30 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">{user.username}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 max-w-xs truncate" title={user.notes}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">
+                      <button 
+                        onClick={() => openEditModal(user)}
+                        className="text-sky-400 hover:text-sky-300 hover:underline focus:outline-none"
+                      >
+                        {user.username}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300 max-w-xs truncate" title={user.notes}>
                         {user.notes || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
-                            user.status === 'OK' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                            user.status === 'Expired' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                            user.status === 'OverQuota' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                        }`}>
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(user.status)}`}>
                             {user.status === 'OK' ? 'Active' : user.status}
                         </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{user.current_sessions} / {user.max_concurrent_sessions}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{(user.total_traffic / 1024 / 1024).toFixed(2)} MB</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                    <button 
-                        onClick={() => openEditModal(user)}
-                        className="text-sky-400 hover:text-sky-300 transition-colors" 
-                        title="Edit"
-                    >
-                        <Pencil className="w-5 h-5" />
-                    </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">{user.current_sessions} / {user.max_concurrent_sessions}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      {formatTraffic(user.total_traffic)} / {user.allowed_traffic ? formatTraffic(user.allowed_traffic) : 'Unlimited'}
                     </td>
                 </tr>
                 ))
             ) : (
                 <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-slate-500 italic">
+                    <td colSpan="5" className="px-6 py-8 text-center text-slate-400 italic">
                         No users found.
                     </td>
                 </tr>
@@ -371,14 +421,14 @@ const Users = () => {
 
       {/* Pagination */}
       <div className="mt-4 flex items-center justify-between">
-          <div className="text-sm text-slate-400">
+          <div className="text-sm text-slate-300">
               Showing <span className="font-medium">{Math.min((page - 1) * pageSize + 1, totalCount)}</span> to <span className="font-medium">{Math.min(page * pageSize, totalCount)}</span> of <span className="font-medium">{totalCount}</span> results
           </div>
           <div className="flex bg-slate-800 rounded-md shadow-sm">
               <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-700 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-700 bg-slate-800 text-sm font-medium text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                   <ChevronLeft className="h-5 w-5" />
               </button>
@@ -389,7 +439,7 @@ const Users = () => {
               <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-700 bg-slate-800 text-sm font-medium text-slate-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-700 bg-slate-800 text-sm font-medium text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                   <ChevronRight className="h-5 w-5" />
               </button>

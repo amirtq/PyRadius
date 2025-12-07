@@ -12,14 +12,14 @@ const Modal = ({ isOpen, onClose, title, children }) => {
           <h3 className="text-lg font-medium leading-6 text-slate-100">{title}</h3>
           <button
             type="button"
-            className="rounded-md bg-transparent text-slate-400 hover:text-slate-200 focus:outline-none"
+            className="rounded-md bg-transparent text-slate-300 hover:text-slate-200 focus:outline-none"
             onClick={onClose}
           >
             <span className="sr-only">Close</span>
             <X className="h-6 w-6" aria-hidden="true" />
           </button>
         </div>
-        <div className="px-4 py-5 sm:p-6 text-slate-300">
+        <div className="px-4 py-5 sm:p-6 text-slate-200">
           {children}
         </div>
       </div>

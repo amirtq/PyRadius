@@ -37,7 +37,7 @@ const Layout = () => {
         <div className="flex justify-between items-center p-6">
           <h1 className="text-2xl font-bold text-sky-400 tracking-tight">PyRadius</h1>
           <button className="md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
-            <X className="w-6 h-6 text-slate-400" />
+            <X className="w-6 h-6 text-slate-300" />
           </button>
         </div>
         <nav className="mt-2 space-y-1">
@@ -50,13 +50,13 @@ const Layout = () => {
                 `flex items-center px-6 py-3 transition-colors ${
                   isActive 
                     ? 'bg-slate-800/50 text-sky-400 border-r-2 border-sky-400' 
-                    : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200'
+                    : 'text-slate-300 hover:bg-slate-800/30 hover:text-slate-200'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <item.icon className={`w-5 h-5 mr-3 ${isActive ? 'text-sky-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                  <item.icon className={`w-5 h-5 mr-3 ${isActive ? 'text-sky-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
                   {item.name}
                 </>
               )}
@@ -79,7 +79,7 @@ const Layout = () => {
         {/* Mobile Header */}
         <header className="bg-slate-900 border-b border-slate-800 md:hidden z-10">
             <div className="px-4 py-4 flex justify-between items-center">
-                <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-400 hover:text-white focus:outline-none">
+                <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-300 hover:text-white focus:outline-none">
                     <Menu className="w-6 h-6" />
                 </button>
                 <div className="text-lg font-semibold text-sky-400">PyRadius</div>

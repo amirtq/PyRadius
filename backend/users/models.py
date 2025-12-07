@@ -211,6 +211,8 @@ class RadiusUser(models.Model):
         """
         Override save to update remaining sessions count.
         """
+        if self.allowed_traffic == 0:
+            self.allowed_traffic = None
         self.remaining_sessions = self.max_concurrent_sessions - self.current_sessions
         super().save(*args, **kwargs)
 
