@@ -108,7 +108,7 @@ const Users = () => {
   const handleDelete = async () => {
     if (!editingUser) return;
     
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    if (globalThis.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
         await api.delete(`/radius-users/${editingUser.id}/`);
         setIsAddModalOpen(false);
