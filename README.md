@@ -40,7 +40,7 @@ Get up and running instantly using the pre-built Docker image with Docker Compos
      radius:
        image: amirtq/pyradius:latest
        container_name: pyradius
-       restart: always
+       restart: unless-stopped
        ports:
          - "80:80"
          - "443:443"
