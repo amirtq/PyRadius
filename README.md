@@ -52,12 +52,9 @@ Get up and running instantly using the pre-built Docker image with Docker Compos
          - .env
    ```
 
-   Create a `.env` file with basic configuration:
+   Download the default configuration:
    ```bash
-   SECRET_KEY=change-me-in-production
-   DEBUG=False
-   AUTH_PORT=1812
-   ACCT_PORT=1813
+   curl -o .env https://raw.githubusercontent.com/amirtq/PyRadius/main/.env
    ```
 
    Create an empty database file:
