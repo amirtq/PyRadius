@@ -380,6 +380,7 @@ const Users = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Sessions</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Traffic</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Password</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50 bg-slate-800">
@@ -406,11 +407,14 @@ const Users = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
                       {formatTraffic(user.total_traffic)} / {user.allowed_traffic ? formatTraffic(user.allowed_traffic) : 'Unlimited'}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300 font-mono">
+                      {user.password_display}
+                    </td>
                 </tr>
                 ))
             ) : (
                 <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-slate-400 italic">
+                    <td colSpan="6" className="px-6 py-8 text-center text-slate-400 italic">
                         No users found.
                     </td>
                 </tr>

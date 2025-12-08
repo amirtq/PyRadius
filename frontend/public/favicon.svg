@@ -1,0 +1,18 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#999">
+    <!-- central hub -->
+    <circle cx="128" cy="128" r="26"/>
+
+    <!-- top node -->
+    <circle cx="128" cy="40" r="18"/>
+    <rect x="122" y="58" width="12" height="52" rx="6"/>
+
+    <!-- left node -->
+    <circle cx="40" cy="128" r="18"/>
+    <rect x="58" y="122" width="52" height="12" rx="6"/>
+
+    <!-- right node -->
+    <circle cx="216" cy="128" r="18"/>
+    <rect x="146" y="122" width="52" height="12" rx="6"/>
+  </g>
+</svg>

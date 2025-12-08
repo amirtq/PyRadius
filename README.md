@@ -28,7 +28,33 @@ A tiny, easy-to-use, and feature-rich Python Django-based RADIUS server for user
 - python-dotenv
 - (Optional) Node.js 22+ for frontend development
 
-## Docker Setup (Recommended)
+## Quick Start (Pre-built Docker Image)
+
+Get up and running instantly using the pre-built Docker image.
+
+1. Create a database file:
+```bash
+touch db.sqlite3
+```
+
+2. Start the container:
+```bash
+docker run -d \
+  --name pyradius \
+  --restart always \
+  -p 80:80 -p 443:443 -p 1812:1812/udp -p 1813:1813/udp \
+  -v $(pwd)/db.sqlite3:/app/db.sqlite3 \
+  amirtq/pyradius:latest
+```
+
+3. Create an Administrator:
+```bash
+docker exec -it pyradius python manage.py users add --admin-user admin password123
+```
+
+4. Access the dashboard at **http://localhost** with username `admin` and password `password123`.
+
+## Docker Setup (Build from Source)
 
 1. Create the database file and set permissions:
 ```bash

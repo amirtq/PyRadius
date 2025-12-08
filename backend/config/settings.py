@@ -22,9 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE = BASE_DIR.parent / '.env'
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE)
-else:
+elif not os.environ.get('SECRET_KEY'):
     # In production (Docker), env vars are already set via docker-compose env_file
-    # Only warn if running locally without .env
+    # Only warn if running locally without .env AND without env vars set
     import sys
     if 'runserver' in sys.argv or 'manage.py' in sys.argv[0]:
         print(f"Warning: .env file not found at {ENV_FILE}")

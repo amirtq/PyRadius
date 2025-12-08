@@ -5,6 +5,12 @@ class RadiusUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     use_cleartext_password = serializers.BooleanField(write_only=True, required=False, default=False)
     status = serializers.CharField(source='status_label', read_only=True)
+    password_display = serializers.SerializerMethodField()
+
+    def get_password_display(self, obj):
+        if obj.password_hash and obj.password_hash.startswith('ctp:'):
+            return obj.password_hash[4:]
+        return 'Encrypted'
 
     class Meta:
         model = RadiusUser
@@ -13,7 +19,7 @@ class RadiusUserSerializer(serializers.ModelSerializer):
             'expiration_date', 'is_active', 'status', 'notes',
             'rx_traffic', 'tx_traffic', 'total_traffic',
             'allowed_traffic', 'current_sessions', 'remaining_sessions',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at', 'password_display'
         )
         read_only_fields = (
             'id', 'created_at', 'updated_at', 
