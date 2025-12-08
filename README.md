@@ -30,29 +30,57 @@ A tiny, easy-to-use, and feature-rich Python Django-based RADIUS server for user
 
 ## Quick Start (Pre-built Docker Image)
 
-Get up and running instantly using the pre-built Docker image.
+Get up and running instantly using the pre-built Docker image with Docker Compose.
 
-1. Create a database file:
-```bash
-touch db.sqlite3
-```
+1. **Create the Project Files**
 
-2. Start the container:
-```bash
-docker run -d \
-  --name pyradius \
-  --restart always \
-  -p 80:80 -p 443:443 -p 1812:1812/udp -p 1813:1813/udp \
-  -v $(pwd)/db.sqlite3:/app/db.sqlite3 \
-  amirtq/pyradius:latest
-```
+   Create a `docker-compose.yml` file:
+   ```yaml
+   services:
+     radius:
+       image: amirtq/pyradius:latest
+       container_name: pyradius
+       restart: always
+       ports:
+         - "80:80"
+         - "443:443"
+         - "1812:1812/udp"
+         - "1813:1813/udp"
+       volumes:
+         - ./db.sqlite3:/app/db.sqlite3
+       env_file:
+         - .env
+   ```
 
-3. Create an Administrator:
-```bash
-docker exec -it pyradius python manage.py users add --admin-user admin password123
-```
+   Create a `.env` file with basic configuration:
+   ```bash
+   SECRET_KEY=change-me-in-production
+   DEBUG=False
+   AUTH_PORT=1812
+   ACCT_PORT=1813
+   ```
 
-4. Access the dashboard at **http://localhost** with username `admin` and password `password123`.
+   Create an empty database file:
+   ```bash
+   touch db.sqlite3
+   chmod 664 db.sqlite3
+   ```
+
+2. **Start the Server**
+
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Create an Administrator**
+
+   ```bash
+   docker exec -it pyradius python manage.py users add --admin-user admin password123
+   ```
+
+4. **Access the Dashboard**
+
+   Open **http://localhost** and login with `admin` / `password123`.
 
 ## Docker Setup (Build from Source)
 
