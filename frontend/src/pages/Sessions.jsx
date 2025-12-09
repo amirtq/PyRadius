@@ -166,6 +166,7 @@ const Sessions = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Duration</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Traffic</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Started</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Last Updated</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">NAS</th>
                 </tr>
             </thead>
@@ -215,6 +216,9 @@ const Sessions = () => {
                             )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                            {formatDate(session.last_updated)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
                             <div>{session.nas_identifier || '-'}</div>
                             <div className="text-xs text-slate-300 italic">{session.nas_ip_address}</div>
                         </td>
@@ -222,7 +226,7 @@ const Sessions = () => {
                     ))
                 ) : (
                     <tr>
-                        <td colSpan="7" className="px-6 py-8 text-center text-slate-400 italic">
+                        <td colSpan="8" className="px-6 py-8 text-center text-slate-400 italic">
                             No sessions found.
                         </td>
                     </tr>
