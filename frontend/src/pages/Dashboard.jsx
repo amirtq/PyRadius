@@ -345,7 +345,7 @@ const Dashboard = () => {
           color="sky"
         />
         <StatCard 
-          title="Total Server Traffic (All NAS Clients)" 
+          title="Total Server Traffic" 
           value={serverTraffic.length > 0 ? formatBytes(serverTraffic[serverTraffic.length-1].total_traffic) : '0 B'} 
           icon={Activity} 
           color="emerald"
