@@ -198,11 +198,11 @@ const Sessions = () => {
                             <div className="flex flex-col gap-0.5">
                                 <span className="flex items-center gap-1 text-xs text-emerald-400/80">
                                     <ArrowDownCircle className="w-3 h-3" />
-                                    {formatBytes(session.input_octets)}
+                                    {formatBytes(session.output_octets)}
                                 </span>
                                 <span className="flex items-center gap-1 text-xs text-sky-400/80">
                                     <ArrowUpCircle className="w-3 h-3" />
-                                    {formatBytes(session.output_octets)}
+                                    {formatBytes(session.input_octets)}
                                 </span>
                             </div>
                         </td>

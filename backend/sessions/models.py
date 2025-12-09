@@ -153,8 +153,8 @@ class RadiusSession(models.Model):
             # We use simple update with F expressions to be atomic
             # This avoids race conditions if multiple sessions update same user
             RadiusUser.objects.filter(username=self.username).update(
-                rx_traffic=F('rx_traffic') + max(0, delta_rx),
-                tx_traffic=F('tx_traffic') + max(0, delta_tx),
+                rx_traffic=F('rx_traffic') + max(0, delta_tx),
+                tx_traffic=F('tx_traffic') + max(0, delta_rx),
                 total_traffic=F('total_traffic') + max(0, delta_rx) + max(0, delta_tx)
             )
         except Exception:
