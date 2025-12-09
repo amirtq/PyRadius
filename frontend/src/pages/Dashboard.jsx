@@ -24,7 +24,7 @@ import {
   PieChart as PieIcon,
   FileText
 } from 'lucide-react';
-import axios from 'axios';
+import api from '../api/client';
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -83,11 +83,6 @@ const Dashboard = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-
       // Calculate start time based on range
       let timeFilter = '';
       
@@ -115,13 +110,13 @@ const Dashboard = () => {
 
       // Fetch all stats concurrently
       const [sessionsRes, trafficRes, userTrafficRes, userSessionsRes, statusRes, logsRes, currentSessionsRes] = await Promise.all([
-        axios.get(`/api/stats/server/sessions/?${timeFilter}`, config),
-        axios.get(`/api/stats/server/traffic/?${timeFilter}`, config),
-        axios.get(`/api/stats/users/traffic/?${timeFilter}&username__icontains=${userFilter}`, config),
-        axios.get(`/api/stats/users/sessions/?${timeFilter}&username__icontains=${userFilter}`, config),
-        axios.get(`/api/stats/users/status-counts/`, config),
-        axios.get(`/api/stats/server/logs/counts/?${timeFilter}`, config),
-        axios.get(`/api/stats/server/sessions/current/`, config)
+        api.get(`/stats/server/sessions/?${timeFilter}`),
+        api.get(`/stats/server/traffic/?${timeFilter}`),
+        api.get(`/stats/users/traffic/?${timeFilter}&username__icontains=${userFilter}`),
+        api.get(`/stats/users/sessions/?${timeFilter}&username__icontains=${userFilter}`),
+        api.get(`/stats/users/status-counts/`),
+        api.get(`/stats/server/logs/counts/?${timeFilter}`),
+        api.get(`/stats/server/sessions/current/`)
       ]);
 
       // Process server sessions data for chart
