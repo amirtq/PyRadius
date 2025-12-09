@@ -95,10 +95,9 @@ class NASClient(models.Model):
         Returns:
             NASClient instance or None if not found
         """
-        try:
-            return cls.objects.get(ip_address=ip_address, is_active=True)
-        except cls.DoesNotExist:
-            return None
+        # Return first active client with this IP
+        # Using filter().first() handles multiple clients with same IP safely
+        return cls.objects.filter(ip_address=ip_address, is_active=True).first()
     
     @classmethod
     def get_by_identifier(cls, identifier: str) -> 'NASClient | None':
@@ -111,10 +110,38 @@ class NASClient(models.Model):
         Returns:
             NASClient instance or None if not found
         """
-        try:
-            return cls.objects.get(identifier=identifier, is_active=True)
-        except cls.DoesNotExist:
+        return cls.objects.filter(identifier=identifier, is_active=True).first()
+
+    @classmethod
+    def get_best_match(cls, ip_address: str, identifier: str | None = None) -> 'NASClient | None':
+        """
+        Find the best matching NAS client given an IP and optional identifier.
+        
+        Args:
+            ip_address: Source IP address
+            identifier: NAS-Identifier attribute (optional)
+            
+        Returns:
+            Best matching NASClient or None
+        """
+        # Get all active clients for this IP
+        qs = cls.objects.filter(ip_address=ip_address, is_active=True)
+        
+        if not qs.exists():
             return None
+            
+        # If identifier provided, try to find exact match
+        if identifier:
+             match = qs.filter(identifier=identifier).first()
+             if match:
+                 return match
+            # If no match for identifier, we return None (strict matching)
+            # This handles case where we have clients A and B on same IP,
+            # and request comes for C. We shouldn't authenticate as A or B.
+             return None
+             
+        # If no identifier provided, return the first one (fallback)
+        return qs.first()
     
     @classmethod
     def find_nas(cls, ip_address: str | None = None, identifier: str | None = None) -> 'NASClient | None':

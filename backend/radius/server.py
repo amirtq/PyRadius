@@ -44,8 +44,11 @@ class DynamicHosts(dict):
     def __getitem__(self, key):
         try:
             from nas.models import NASClient
-            nas = NASClient.objects.get(ip_address=key, is_active=True)
-            return NASHost(nas.get_secret_bytes())
+            # Use filter().first() to handle multiple clients safely
+            nas = NASClient.objects.filter(ip_address=key, is_active=True).first()
+            if nas:
+                return NASHost(nas.get_secret_bytes())
+            raise KeyError(key)
         except Exception:
             raise KeyError(key)
 
@@ -119,7 +122,45 @@ class RadiusServer(server.Server):
         except Exception as e:
             logger.error(f"Error fetching NAS secret for {nas_ip}: {e}")
             return None
-    
+
+    def _AddSecret(self, pkt):
+        """
+        Override pyrad's _AddSecret to support multiple NAS clients with the same IP
+        by also checking the NAS-Identifier.
+        
+        This method is called by pyrad before HandleAuth/AcctPacket.
+        """
+        try:
+            ip = pkt.source[0]
+            
+            # Extract NAS-Identifier (Attribute 32)
+            identifier = None
+            if 32 in pkt:
+                val = pkt[32]
+                if val:
+                    # val is a list of values, take first
+                    try:
+                        raw_id = val[0]
+                        if isinstance(raw_id, bytes):
+                            identifier = raw_id.decode('utf-8', errors='ignore')
+                        else:
+                            identifier = str(raw_id)
+                    except Exception:
+                        pass
+
+            from nas.models import NASClient
+            nas = NASClient.get_best_match(ip, identifier)
+            
+            if nas:
+                pkt.secret = nas.get_secret_bytes()
+            else:
+                # If no NAS found, we don't set secret.
+                # HandleAuthPacket/HandleAcctPacket should check for this.
+                pass
+                
+        except Exception as e:
+            logger.error(f"Error resolving NAS secret: {e}")
+
     def HandleAuthPacket(self, pkt):
         """
         Handle an incoming authentication packet.
@@ -130,16 +171,10 @@ class RadiusServer(server.Server):
         logger.debug(f"Received auth packet from {pkt.source}")
         
         try:
-            # Get NAS secret for this client
-            client_ip = pkt.source[0]
-            secret = self._get_nas_secret(client_ip)
-            
-            if not secret:
-                logger.warning(f"Unknown NAS client: {client_ip}")
+            # Secret should have been set by _AddSecret
+            if not getattr(pkt, 'secret', None):
+                logger.warning(f"Unknown NAS client or secret not found: {pkt.source[0]}")
                 return
-            
-            # Set the secret on the packet for decryption
-            pkt.secret = secret
             
             # Process the authentication request
             reply = self.auth_handler.handle_auth_request(pkt, pkt.source)
@@ -163,16 +198,10 @@ class RadiusServer(server.Server):
         logger.debug(f"Received acct packet from {pkt.source}")
         
         try:
-            # Get NAS secret for this client
-            client_ip = pkt.source[0]
-            secret = self._get_nas_secret(client_ip)
-            
-            if not secret:
-                logger.warning(f"Unknown NAS client: {client_ip}")
+            # Secret should have been set by _AddSecret
+            if not getattr(pkt, 'secret', None):
+                logger.warning(f"Unknown NAS client or secret not found: {pkt.source[0]}")
                 return
-            
-            # Set the secret on the packet
-            pkt.secret = secret
             
             # Process the accounting request
             reply = self.acct_handler.handle_acct_request(pkt, pkt.source)
