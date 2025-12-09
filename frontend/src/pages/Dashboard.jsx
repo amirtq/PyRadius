@@ -34,9 +34,11 @@ const Dashboard = () => {
   const [serverSessions, setServerSessions] = useState([]);
   const [realTimeActiveSessions, setRealTimeActiveSessions] = useState(0);
   const [serverTraffic, setServerTraffic] = useState([]);
+  const [serverTrafficUnit, setServerTrafficUnit] = useState('MB');
   
   // User Data States
   const [userTrafficStats, setUserTrafficStats] = useState([]);
+  const [userTrafficUnit, setUserTrafficUnit] = useState('MB');
   const [availableTrafficUsers, setAvailableTrafficUsers] = useState([]);
   
   const [userSessionStats, setUserSessionStats] = useState([]);
@@ -53,6 +55,20 @@ const Dashboard = () => {
   const [timeRange, setTimeRange] = useState('24h');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  // Helper to get best unit and divisor
+  const getBestUnitAndDivisor = (bytes) => {
+    const k = 1024;
+    const mb = Math.pow(k, 2);
+    const gb = Math.pow(k, 3);
+    const tb = Math.pow(k, 4);
+    const pb = Math.pow(k, 5);
+
+    if (bytes < gb) return { unit: 'MB', divisor: mb };
+    if (bytes < tb) return { unit: 'GB', divisor: gb };
+    if (bytes < pb) return { unit: 'TB', divisor: tb };
+    return { unit: 'PB', divisor: pb };
+  };
 
   // Helper to format bytes
   const formatBytes = (bytes, decimals = 2) => {
@@ -117,6 +133,14 @@ const Dashboard = () => {
           fullDate: new Date(item.timestamp).toLocaleString()
         }));
 
+      // Calculate dynamic unit for Server Traffic
+      let maxServerBytes = 0;
+      trafficRes.data.forEach(item => {
+         maxServerBytes = Math.max(maxServerBytes, item.total_rx || 0, item.total_tx || 0);
+      });
+      const { unit: sUnit, divisor: sDivisor } = getBestUnitAndDivisor(maxServerBytes);
+      setServerTrafficUnit(sUnit);
+
       // Process server traffic data for chart
       const trafficData = trafficRes.data
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
@@ -124,13 +148,21 @@ const Dashboard = () => {
           ...item,
           time: new Date(item.timestamp).toLocaleTimeString(),
           fullDate: new Date(item.timestamp).toLocaleString(),
-          rx_mb: (item.total_rx / (1024 * 1024)).toFixed(2),
-          tx_mb: (item.total_tx / (1024 * 1024)).toFixed(2),
-          total_mb: (item.total_traffic / (1024 * 1024)).toFixed(2)
+          rx: parseFloat((item.total_rx / sDivisor).toFixed(2)),
+          tx: parseFloat((item.total_tx / sDivisor).toFixed(2)),
+          total: parseFloat((item.total_traffic / sDivisor).toFixed(2))
         }));
 
       // --- Process User Traffic ---
       const rawUserTraffic = userTrafficRes.data;
+      
+      let maxUserBytes = 0;
+      rawUserTraffic.forEach(item => {
+         maxUserBytes = Math.max(maxUserBytes, item.total_traffic || 0);
+      });
+      const { unit: uUnit, divisor: uDivisor } = getBestUnitAndDivisor(maxUserBytes);
+      setUserTrafficUnit(uUnit);
+      
       const trafficUsersSet = new Set(rawUserTraffic.map(item => item.username));
       const trafficUsersList = Array.from(trafficUsersSet).sort((a, b) => a.localeCompare(b));
       
@@ -144,7 +176,7 @@ const Dashboard = () => {
             fullDate: new Date(item.timestamp).toLocaleString(),
           };
         }
-        trafficHistoryMap[timeKey][item.username] = parseFloat((item.total_traffic / (1024 * 1024)).toFixed(2));
+        trafficHistoryMap[timeKey][item.username] = parseFloat((item.total_traffic / uDivisor).toFixed(2));
       }
       const processedUserTraffic = Object.values(trafficHistoryMap)
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -387,7 +419,7 @@ const Dashboard = () => {
 
         {/* Traffic Chart */}
         <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-sm">
-          <h3 className="text-lg font-semibold text-white mb-6">Traffic History (MB)</h3>
+          <h3 className="text-lg font-semibold text-white mb-6">Traffic History ({serverTrafficUnit})</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={serverTraffic}>
@@ -413,7 +445,7 @@ const Dashboard = () => {
                 <Legend />
                 <Line 
                   type="monotone" 
-                  dataKey="rx_mb" 
+                  dataKey="rx" 
                   stroke="#10b981" 
                   strokeWidth={2} 
                   dot={false}
@@ -421,7 +453,7 @@ const Dashboard = () => {
                 />
                 <Line 
                   type="monotone" 
-                  dataKey="tx_mb" 
+                  dataKey="tx" 
                   stroke="#3b82f6" 
                   strokeWidth={2} 
                   dot={false}
@@ -503,7 +535,7 @@ const Dashboard = () => {
 
         {/* User Traffic Statistics */}
         <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-sm overflow-hidden">
-          <h3 className="text-lg font-semibold text-white mb-6">User Traffic Statistics</h3>
+          <h3 className="text-lg font-semibold text-white mb-6">User Traffic Statistics ({userTrafficUnit})</h3>
           {userTrafficStats.length === 0 ? (
             <div className="text-center text-slate-500 py-12">
               No user statistics found for the selected period.
