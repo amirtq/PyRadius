@@ -137,8 +137,16 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'HOST': get_env_variable('MYSQL_HOST'),
+        'PORT': get_env_variable('MYSQL_PORT', cast=int),
+        'NAME': get_env_variable('MYSQL_DATABASE'),
+        'USER': get_env_variable('MYSQL_USER'),
+        'PASSWORD': get_env_variable('MYSQL_PASSWORD'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
 

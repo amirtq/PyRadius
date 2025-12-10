@@ -13,14 +13,16 @@ A tiny, easy-to-use, and feature-rich Python Django-based RADIUS server for user
 - **Account Expiration**: Support for user account expiration dates.
 - **NAS Client Management**: Manage multiple NAS clients (OpenVPN servers) with shared secrets.
 - **Real-time Logging**: View RADIUS server logs in real-time via Web UI or CLI.
-- **SQLite Database**: Simple file-based storage, easily upgradeable to PostgreSQL/MySQL.
+- **MariaDB Database**: Production-ready MariaDB 10.11 database with persistent storage.
 
 ## Requirements
 
 - Python 3.12+
 - Django 6.0+
+- MariaDB 10.11+ (or MySQL 8.0+)
 - pyrad 2.4+
 - bcrypt 4.0+
+- mysqlclient 2.2+
 - djangorestframework
 - djangorestframework-simplejwt
 - django-cors-headers
@@ -37,17 +39,41 @@ Get up and running instantly using the pre-built Docker image with Docker Compos
    Create a `docker-compose.yml` file:
    ```yaml
    services:
+     mysql:
+       image: mariadb:10.11
+       container_name: pyradius-mysql
+       restart: unless-stopped
+       environment:
+         MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+         MYSQL_DATABASE: ${MYSQL_DATABASE}
+         MYSQL_USER: ${MYSQL_USER}
+         MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+       volumes:
+         - ./db/mysql/data:/var/lib/mysql
+         - ./db/mysql/config:/etc/mysql/conf.d
+       ports:
+         - "3306:3306"
+       healthcheck:
+         test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+         interval: 10s
+         timeout: 5s
+         retries: 5
+         start_period: 30s
+
      radius:
        image: amirtq/pyradius:latest
        container_name: pyradius
        restart: unless-stopped
+       depends_on:
+         mysql:
+           condition: service_healthy
        ports:
          - "80:80"
          - "443:443"
          - "1812:1812/udp"
          - "1813:1813/udp"
        volumes:
-         - ./db.sqlite3:/app/db.sqlite3
+         - ./nginx/ssl:/etc/nginx/ssl
        env_file:
          - .env
    ```
@@ -57,10 +83,9 @@ Get up and running instantly using the pre-built Docker image with Docker Compos
    curl -o .env https://raw.githubusercontent.com/amirtq/PyRadius/main/.env
    ```
 
-   Create an empty database file:
+   Create the required directories:
    ```bash
-   touch db.sqlite3
-   chmod 664 db.sqlite3
+   mkdir -p db/mysql/data db/mysql/config nginx/ssl
    ```
 
 2. **Start the Server**
@@ -68,6 +93,8 @@ Get up and running instantly using the pre-built Docker image with Docker Compos
    ```bash
    docker-compose up -d
    ```
+
+   The first startup will initialize the MariaDB database automatically. The radius container will wait for the database to be healthy before starting.
 
 3. **Create an Administrator**
 
@@ -81,26 +108,33 @@ Get up and running instantly using the pre-built Docker image with Docker Compos
 
 ## Docker Setup (Build from Source)
 
-1. Create the database file and set permissions:
+1. Clone the repository:
 ```bash
-touch backend/db.sqlite3
-chmod 664 backend/db.sqlite3
+git clone https://github.com/amirtq/PyRadius.git
+cd PyRadius
 ```
 
-2. Build and start the container:
+2. Create MySQL directories:
+```bash
+mkdir -p db/mysql/data db/mysql/config
+```
+
+3. Build and start the container:
 ```bash
 docker-compose up -d --build
 ```
 - **Web Dashboard**: http://server_ip (port 80)
+- **HTTPS Dashboard**: https://server_ip (port 443)
 - **RADIUS Auth Port**: 1812/udp
 - **RADIUS Acct Port**: 1813/udp
+- **MySQL Port**: 3306
 
-3. Create an Administrator (required for Web UI):
+4. Create an Administrator (required for Web UI):
 ```bash
 docker exec -it pyradius python manage.py users add --admin-user admin password123
 ```
 
-4. View logs:
+5. View logs:
 ```bash
 docker-compose logs -f
 ```
@@ -129,6 +163,22 @@ docker exec -it pyradius python manage.py sessions list --active
 docker exec -it pyradius python manage.py logs -n 100
 ```
 
+## Migrating from SQLite
+
+If you have an existing SQLite database and want to migrate to MySQL, use the `import_sqlite` command:
+
+```bash
+# Preview what will be imported (dry run)
+docker exec -it pyradius python manage.py import_sqlite /path/to/db.sqlite3 --dry-run
+
+# Import and truncate existing MySQL tables first
+docker exec -it pyradius python manage.py import_sqlite /path/to/db.sqlite3 --truncate
+```
+
+**Options:**
+- `--dry-run`: Preview what would be imported without making changes
+- `--truncate`: Clear existing MySQL tables before importing (WARNING: destructive)
+
 ## Manual Installation
 
 1. Clone the repository and navigate to backend:
@@ -147,12 +197,35 @@ source penv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Run migrations:
+4. Install and configure MySQL:
+```bash
+# Ubuntu/Debian
+sudo apt install mysql-server mysql-client
+
+# Create database and user
+mysql -u root -p <<EOF
+CREATE DATABASE pyradius CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'pyradius'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON pyradius.* TO 'pyradius'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+```
+
+5. Configure environment variables in `.env`:
+```bash
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_DATABASE=pyradius
+MYSQL_USER=pyradius
+MYSQL_PASSWORD=your_password
+```
+
+6. Run migrations:
 ```bash
 python3 manage.py migrate
 ```
 
-5. Create an Administrator (required for Web UI):
+7. Create an Administrator (required for Web UI):
 ```bash
 python3 manage.py users add --admin-user admin password123
 ```
@@ -452,6 +525,19 @@ python3 manage.py logs -f "error"
 python3 manage.py logs --flushlogs
 ```
 
+### SQLite Import (`import_sqlite`)
+
+```bash
+# Import data from SQLite to MySQL
+python3 manage.py import_sqlite <sqlite_path> [options]
+  --dry-run            Preview what would be imported
+  --truncate           Truncate existing tables before importing
+
+# Examples:
+python3 manage.py import_sqlite /path/to/db.sqlite3 --dry-run
+python3 manage.py import_sqlite /path/to/db.sqlite3 --truncate
+```
+
 ## OpenVPN Configuration
 
 ### radiusplugin.conf
@@ -491,7 +577,7 @@ plugin /usr/lib/openvpn/radiusplugin.so /etc/openvpn/radiusplugin.conf
 
 ## Configuration
 
-Server configuration is managed via environment variables or the `.env` file (inside `backend/` directory).
+Server configuration is managed via environment variables or the `.env` file.
 
 ### Environment Variables
 
@@ -507,6 +593,12 @@ Server configuration is managed via environment variables or the `.env` file (in
 | `RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT` | `100` | Max inactive sessions to retain |
 | `RADIUS_LOG_RETENTION` | `1000` | Max log entries to retain |
 | `RADIUS_STALE_SESSION_MULTIPLIER` | `5` | Multiplier for detecting dead sessions |
+| `MYSQL_HOST` | `127.0.0.1` | MySQL server hostname |
+| `MYSQL_PORT` | `3306` | MySQL server port |
+| `MYSQL_DATABASE` | `pyradius` | MySQL database name |
+| `MYSQL_USER` | `pyradius` | MySQL username |
+| `MYSQL_PASSWORD` | - | MySQL user password |
+| `MYSQL_ROOT_PASSWORD` | - | MySQL root password (for container initialization) |
 
 ### Example `.env` file
 
@@ -524,7 +616,25 @@ ACCT_INTERIM_INTERVAL=600
 RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT=1000
 RADIUS_LOG_RETENTION=1000
 RADIUS_STALE_SESSION_MULTIPLIER=5
+
+# MySQL Configuration
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_DATABASE=pyradius
+MYSQL_USER=pyradius
+MYSQL_PASSWORD=your_secure_password
+MYSQL_ROOT_PASSWORD=your_root_password
 ```
+
+### MySQL Configuration
+
+The MySQL configuration can be customized via the `db/mysql/config/pyradius.cnf` file which is mounted to `/etc/mysql/conf.d/` in the container.
+
+Default configuration includes:
+- UTF-8 character set (utf8mb4)
+- 100 max connections
+- 256MB InnoDB buffer pool
+- Network binding to allow external connections
 
 ## Architecture
 
@@ -532,7 +642,7 @@ RADIUS_STALE_SESSION_MULTIPLIER=5
 .
 ├── backend/                  # Django Backend
 │   ├── config/               # Django project configuration
-│   │   ├── settings.py       # Settings with RADIUS_CONFIG
+│   │   ├── settings.py       # Settings with RADIUS_CONFIG and MySQL
 │   │   ├── urls.py           # API routes and frontend catch-all
 │   │   └── pagination.py     # API pagination config
 │   ├── users/                # User management app
@@ -554,11 +664,10 @@ RADIUS_STALE_SESSION_MULTIPLIER=5
 │   │   ├── acct_handler.py   # Accounting handler
 │   │   ├── models.py         # RadiusLog model
 │   │   ├── logging_handler.py # Database logging handler
-│   │   └── management/       # CLI commands (start, logs)
+│   │   └── management/       # CLI commands (start, logs, import_sqlite)
 │   ├── frontend_dist/        # Compiled Frontend assets (served by Django)
 │   ├── manage.py             # Django management script
-│   ├── requirements.txt      # Python dependencies
-│   └── .env                  # Environment configuration
+│   └── requirements.txt      # Python dependencies
 ├── frontend/                 # React Frontend
 │   ├── src/
 │   │   ├── api/              # API client with JWT handling
@@ -567,8 +676,18 @@ RADIUS_STALE_SESSION_MULTIPLIER=5
 │   │   └── App.jsx           # Router configuration
 │   ├── package.json          # Node dependencies
 │   └── vite.config.js        # Build configuration
+├── db/                       # Database files
+│   └── mysql/
+│       ├── config/           # MySQL configuration (mounted to container)
+│       │   └── pyradius.cnf  # Custom MySQL settings
+│       └── data/             # MySQL data directory (mounted to container)
+├── nginx/                    # Nginx configuration
+│   ├── nginx.conf            # Nginx server config
+│   ├── generate-ssl.sh       # SSL certificate generation script
+│   └── ssl/                  # SSL certificates
+├── .env                      # Environment configuration
 ├── docker-compose.yml        # Docker orchestration
-├── Dockerfile                # Multi-stage Docker build
+├── Dockerfile                # Multi-stage Docker build (Node + MySQL + Python)
 └── entrypoint.sh             # Container startup script
 ```
 
@@ -637,6 +756,34 @@ python3 manage.py sessions list --active
 
 ```bash
 python3 manage.py sessions --flushsessions
+```
+
+### MySQL Connection Issues
+
+```bash
+# Check if MySQL is running in the container
+docker exec -it pyradius mysqladmin ping -h127.0.0.1
+
+# Connect to MySQL shell
+docker exec -it pyradius mysql -u root -p
+
+# Check database status
+docker exec -it pyradius mysql -u pyradius -p pyradius -e "SHOW TABLES;"
+```
+
+### MySQL Data Persistence
+
+MySQL data is stored in `db/mysql/data/` on the host. If you need to reset the database:
+
+```bash
+# Stop the container
+docker-compose down
+
+# Remove MySQL data (WARNING: destructive)
+sudo rm -rf db/mysql/data/*
+
+# Restart (will reinitialize)
+docker-compose up -d
 ```
 
 ### Reset All Data

@@ -16,10 +16,14 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install Nginx, OpenSSL, and other dependencies
+# Install Nginx, OpenSSL, and MySQL client dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     openssl \
+    default-libmysqlclient-dev \
+    pkg-config \
+    gcc \
+    default-mysql-client \
     && rm -rf /var/lib/apt/lists/* \
     && rm /etc/nginx/sites-enabled/default
 

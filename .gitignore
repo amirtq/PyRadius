@@ -10,3 +10,7 @@ backend/frontend_dist/
 nginx/ssl/*.crt
 nginx/ssl/*.key
 nginx/ssl/*.pem
+.DS_Store
+
+# MySQL data directory (keep config tracked)
+db/mysql/data/
