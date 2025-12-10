@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     'sessions',
     'radius',
     'stats',
+    'scheduler',
 ]
 
 MIDDLEWARE = [
@@ -224,6 +225,19 @@ RADIUS_CONFIG = {
     'MAX_INACTIVE_SESSIONS': get_env_variable('RADIUS_INACTIVE_SESSION_DB_RETENTION_LIMIT', cast=int),
     # Multiplier for ACCT_INTERIM_INTERVAL to consider a session dead/stale
     'STALE_SESSION_MULTIPLIER': get_env_variable('RADIUS_STALE_SESSION_MULTIPLIER', cast=int),
+}
+
+# =============================================================================
+# Cleanup Jobs Configuration
+# =============================================================================
+
+CLEANUP_CONFIG = {
+    # Interval for running log cleanup job (in seconds)
+    'LOG_INTERVAL': get_env_variable('CLEANUP_LOG_INTERVAL', default=300, required=False, cast=int),
+    # Interval for running dead session cleanup job (in seconds)
+    'DEAD_SESSION_INTERVAL': get_env_variable('CLEANUP_DEAD_SESSION_INTERVAL', default=300, required=False, cast=int),
+    # Interval for running inactive session cleanup job (in seconds)
+    'INACTIVE_SESSION_INTERVAL': get_env_variable('CLEANUP_INACTIVE_SESSION_INTERVAL', default=3600, required=False, cast=int),
 }
 
 # =============================================================================
