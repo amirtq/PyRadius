@@ -14,3 +14,5 @@ nginx/ssl/*.pem
 
 # MySQL data directory (keep config tracked)
 db/mysql/data/
+db/mysql/logs/error.log
+db/mysql/logs/slow.log
