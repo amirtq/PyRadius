@@ -73,9 +73,13 @@ class AuthenticationHandler:
             logger.warning(f"Unknown NAS: ip={nas_ip}, identifier={nas_identifier}")
             return self._create_reject_response(pkt, "Unknown NAS client")
         
-        # Look up user
+        # Look up user (optimized: only fetch fields needed for auth)
         try:
-            user = RadiusUser.objects.get(username=username)
+            user = RadiusUser.objects.only(
+                'username', 'password_hash', 'is_active', 
+                'expiration_date', 'total_traffic', 'allowed_traffic',
+                'max_concurrent_sessions', 'current_sessions'
+            ).get(username=username)
         except RadiusUser.DoesNotExist:
             logger.warning(f"User not found: {username}")
             return self._create_reject_response(pkt, "Invalid credentials")

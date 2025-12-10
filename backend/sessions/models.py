@@ -270,8 +270,8 @@ class RadiusSession(models.Model):
         """
         Create a new active session.
         """
-        # Cleanup old inactive sessions before creating a new one
-        cls.cleanup_inactive_sessions()
+        # Note: Inactive session cleanup is now handled by the scheduler
+        # (scheduler.jobs.cleanup.cleanup_inactive_sessions) to avoid blocking
 
         session = cls(
             session_id=session_id,

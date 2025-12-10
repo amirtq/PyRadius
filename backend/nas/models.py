@@ -5,9 +5,57 @@ This module defines the NASClient model for storing Network Access Server
 (NAS) configurations, including shared secrets for RADIUS authentication.
 """
 
+import threading
+import time
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 import ipaddress
+
+
+# Simple in-memory cache for NAS clients with TTL
+# Thread-safe implementation using threading.Lock
+class NASCache:
+    """Thread-safe in-memory cache for NAS clients."""
+    
+    def __init__(self, default_ttl: int = 300):
+        """Initialize cache with default TTL in seconds."""
+        self._cache: dict = {}
+        self._lock = threading.Lock()
+        self._default_ttl = default_ttl
+    
+    def get(self, key: str):
+        """Get item from cache. Returns None if not found or expired."""
+        with self._lock:
+            entry = self._cache.get(key)
+            if entry is None:
+                return None
+            value, expires_at = entry
+            if time.time() > expires_at:
+                # Expired, remove from cache
+                del self._cache[key]
+                return None
+            return value
+    
+    def set(self, key: str, value, ttl: int | None = None):
+        """Set item in cache with optional TTL override."""
+        ttl = ttl if ttl is not None else self._default_ttl
+        expires_at = time.time() + ttl
+        with self._lock:
+            self._cache[key] = (value, expires_at)
+    
+    def clear(self):
+        """Clear all cached entries."""
+        with self._lock:
+            self._cache.clear()
+    
+    def invalidate(self, key: str):
+        """Remove a specific key from cache."""
+        with self._lock:
+            self._cache.pop(key, None)
+
+
+# Global NAS cache instance (300 seconds = 5 minutes TTL)
+_nas_cache = NASCache(default_ttl=300)
 
 
 class NASClient(models.Model):
@@ -87,7 +135,7 @@ class NASClient(models.Model):
     @classmethod
     def get_by_ip(cls, ip_address: str) -> 'NASClient | None':
         """
-        Get a NAS client by its IP address.
+        Get a NAS client by its IP address (with caching).
         
         Args:
             ip_address: The IP address to look up
@@ -95,14 +143,24 @@ class NASClient(models.Model):
         Returns:
             NASClient instance or None if not found
         """
-        # Return first active client with this IP
-        # Using filter().first() handles multiple clients with same IP safely
-        return cls.objects.filter(ip_address=ip_address, is_active=True).first()
+        cache_key = f"nas_ip:{ip_address}"
+        
+        # Try cache first
+        cached = _nas_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        # Query database
+        nas = cls.objects.filter(ip_address=ip_address, is_active=True).first()
+        
+        # Cache result (even None to avoid repeated lookups for invalid IPs)
+        _nas_cache.set(cache_key, nas)
+        return nas
     
     @classmethod
     def get_by_identifier(cls, identifier: str) -> 'NASClient | None':
         """
-        Get a NAS client by its identifier.
+        Get a NAS client by its identifier (with caching).
         
         Args:
             identifier: The NAS identifier to look up
@@ -110,12 +168,24 @@ class NASClient(models.Model):
         Returns:
             NASClient instance or None if not found
         """
-        return cls.objects.filter(identifier=identifier, is_active=True).first()
+        cache_key = f"nas_id:{identifier}"
+        
+        # Try cache first
+        cached = _nas_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        # Query database
+        nas = cls.objects.filter(identifier=identifier, is_active=True).first()
+        
+        # Cache result
+        _nas_cache.set(cache_key, nas)
+        return nas
 
     @classmethod
     def get_best_match(cls, ip_address: str, identifier: str | None = None) -> 'NASClient | None':
         """
-        Find the best matching NAS client given an IP and optional identifier.
+        Find the best matching NAS client given an IP and optional identifier (with caching).
         
         Args:
             ip_address: Source IP address
@@ -124,29 +194,43 @@ class NASClient(models.Model):
         Returns:
             Best matching NASClient or None
         """
+        # Create cache key based on both parameters
+        cache_key = f"nas_match:{ip_address}:{identifier or ''}"
+        
+        # Try cache first
+        cached = _nas_cache.get(cache_key)
+        if cached is not None:
+            # Handle cached None (stored as False to distinguish from cache miss)
+            return cached if cached is not False else None
+        
         # Get all active clients for this IP
         qs = cls.objects.filter(ip_address=ip_address, is_active=True)
         
         if not qs.exists():
+            _nas_cache.set(cache_key, False)  # Cache "not found"
             return None
             
         # If identifier provided, try to find exact match
         if identifier:
-             match = qs.filter(identifier=identifier).first()
-             if match:
-                 return match
+            match = qs.filter(identifier=identifier).first()
+            if match:
+                _nas_cache.set(cache_key, match)
+                return match
             # If no match for identifier, we return None (strict matching)
             # This handles case where we have clients A and B on same IP,
             # and request comes for C. We shouldn't authenticate as A or B.
-             return None
+            _nas_cache.set(cache_key, False)  # Cache "not found"
+            return None
              
         # If no identifier provided, return the first one (fallback)
-        return qs.first()
+        nas = qs.first()
+        _nas_cache.set(cache_key, nas if nas else False)
+        return nas
     
     @classmethod
     def find_nas(cls, ip_address: str | None = None, identifier: str | None = None) -> 'NASClient | None':
         """
-        Find a NAS client by IP address or identifier.
+        Find a NAS client by IP address or identifier (with caching).
         
         Tries to find by IP first, then by identifier.
         
@@ -168,6 +252,23 @@ class NASClient(models.Model):
                 return nas
         
         return None
+    
+    @classmethod
+    def clear_cache(cls):
+        """Clear the NAS cache. Call this when NAS configuration changes."""
+        _nas_cache.clear()
+    
+    def save(self, *args, **kwargs):
+        """Override save to invalidate cache when NAS is modified."""
+        super().save(*args, **kwargs)
+        # Clear cache when any NAS is modified
+        _nas_cache.clear()
+    
+    def delete(self, *args, **kwargs):
+        """Override delete to invalidate cache when NAS is removed."""
+        super().delete(*args, **kwargs)
+        # Clear cache when any NAS is deleted
+        _nas_cache.clear()
     
     def is_ip_allowed(self, source_ip: str) -> bool:
         """
