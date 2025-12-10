@@ -108,6 +108,7 @@ def start_scheduler() -> bool:
         # Register all jobs
         _register_cleanup_jobs()
         _register_stats_jobs()
+        _register_session_buffer_jobs()
         
         # Start the scheduler
         scheduler = get_scheduler()
@@ -210,6 +211,22 @@ def _register_stats_jobs() -> None:
     )
 
 
+def _register_session_buffer_jobs() -> None:
+    """Register session buffer flush job with the scheduler."""
+    from django.conf import settings
+    from scheduler.jobs.session_buffer import flush_session_buffer
+    
+    # Get buffer flush interval from settings (default: 5 seconds)
+    flush_interval = getattr(settings, 'SESSION_BUFFER_FLUSH_INTERVAL', 5)
+    
+    add_job(
+        flush_session_buffer,
+        job_id='flush_session_buffer',
+        name='Flush Session Buffer',
+        interval_seconds=flush_interval
+    )
+
+
 def stop_scheduler() -> None:
     """
     Stop the scheduler gracefully.
@@ -218,12 +235,25 @@ def stop_scheduler() -> None:
     
     if _scheduler is not None and _scheduler_started:
         try:
+            # Flush session buffer before stopping to prevent data loss
+            _flush_session_buffer_on_shutdown()
+            
             _scheduler.shutdown(wait=False)
             logger.info("Scheduler stopped")
         except Exception as e:
             logger.error(f"Error stopping scheduler: {e}")
         finally:
             _scheduler_started = False
+
+
+def _flush_session_buffer_on_shutdown() -> None:
+    """Flush the session buffer on shutdown to prevent data loss."""
+    try:
+        from sessions.buffer import get_session_buffer
+        buffer = get_session_buffer()
+        buffer.shutdown()
+    except Exception as e:
+        logger.error(f"Error flushing session buffer on shutdown: {e}")
 
 
 def is_scheduler_running() -> bool:

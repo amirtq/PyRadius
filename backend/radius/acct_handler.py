@@ -115,7 +115,8 @@ class AccountingHandler:
         """
         Handle Accounting-Start request.
         
-        Creates a new session record for the user.
+        Queues a new session record for the user in the session buffer.
+        The session will be written to the database during the next buffer flush.
         
         Args:
             pkt: The accounting packet
@@ -124,7 +125,7 @@ class AccountingHandler:
             nas_identifier: NAS identifier
             nas_ip: NAS IP address
         """
-        from sessions.models import RadiusSession
+        from sessions.buffer import get_session_buffer
         
         if not username or not session_id:
             logger.warning("Acct-Start missing required attributes")
@@ -134,45 +135,40 @@ class AccountingHandler:
         framed_ip = self._get_attribute(pkt, 'Framed-IP-Address')
         calling_station_id = self._get_attribute(pkt, 'Calling-Station-Id') or ''
         
-        # Check if session already exists
+        # Check if session already exists in buffer
+        buffer = get_session_buffer()
+        if buffer.is_session_pending(session_id, nas_ip):
+            logger.warning(f"Session {session_id} already pending in buffer, ignoring start")
+            return
+        
+        # Check if session already exists in database
+        from sessions.models import RadiusSession
         existing = RadiusSession.find_session(session_id, nas_ip)
         if existing:
-            logger.warning(f"Session {session_id} already exists, ignoring start")
+            logger.warning(f"Session {session_id} already exists in database, ignoring start")
             return
-
-        # Check for stale sessions with same Framed-IP (re-authentication race condition fix)
-        if framed_ip:
-            stale_sessions = RadiusSession.objects.filter(
-                username=username,
-                status=RadiusSession.STATUS_ACTIVE,
-                framed_ip_address=framed_ip
-            )
-            for stale in stale_sessions:
-                # Double check to ensure we don't process the current session
-                if stale.session_id != session_id:
-                    logger.info(f"Closing stale session {stale.session_id} for user {username} on IP {framed_ip} due to new session start")
-                    stale.stop_session(terminate_cause=RadiusSession.TERMINATE_CAUSE_NAS_REQUEST)
         
-        # Create new session
+        # Queue the session start in the buffer
+        # Note: Stale session cleanup is handled during buffer flush
         try:
-            RadiusSession.create_session(
+            buffer.add_start(
                 session_id=session_id,
                 username=username,
-                nas_identifier=nas_identifier or '',
                 nas_ip_address=nas_ip,
+                nas_identifier=nas_identifier or '',
                 framed_ip_address=framed_ip,
                 calling_station_id=calling_station_id
             )
-            logger.info(f"Session started: {session_id} for user {username}")
+            logger.info(f"Session queued: {session_id} for user {username}")
         except Exception as e:
-            logger.error(f"Error creating session: {e}")
+            logger.error(f"Error queuing session: {e}")
     
     def _handle_stop(self, pkt: packet.AcctPacket, username: Optional[str],
                      session_id: Optional[str], nas_ip: str) -> None:
         """
         Handle Accounting-Stop request.
         
-        Marks the session as stopped and updates statistics.
+        Queues the session stop in the buffer for batch processing.
         
         Args:
             pkt: The accounting packet
@@ -180,17 +176,14 @@ class AccountingHandler:
             session_id: Session identifier
             nas_ip: NAS IP address
         """
-        from sessions.models import RadiusSession
+        from sessions.buffer import get_session_buffer
         
         if not session_id:
             logger.warning("Acct-Stop missing session ID")
             return
         
-        # Find the session
-        session = RadiusSession.find_session(session_id, nas_ip)
-        if not session:
-            logger.warning(f"Session {session_id} not found for stop")
-            return
+        if not username:
+            username = ''
         
         # Get statistics from packet
         session_time = self._get_int_attribute(pkt, 'Acct-Session-Time')
@@ -200,48 +193,45 @@ class AccountingHandler:
         output_packets = self._get_int_attribute(pkt, 'Acct-Output-Packets')
         terminate_cause = self._get_int_attribute(pkt, 'Acct-Terminate-Cause', ACCT_TERMINATE_CAUSE_MAP)
         
-        # Stop the session
+        # Queue the session stop in the buffer
         try:
-            # Build arguments dict and filter out None values to handle optional attributes
-            stop_kwargs = {
-                'terminate_cause': terminate_cause,
-                'session_time': session_time,
-                'input_octets': input_octets,
-                'output_octets': output_octets,
-                'input_packets': input_packets,
-                'output_packets': output_packets
-            }
-            stop_kwargs = {k: v for k, v in stop_kwargs.items() if v is not None}
-
-            session.stop_session(**stop_kwargs)
-            logger.info(f"Session stopped: {session_id} for user {username}, "
+            buffer = get_session_buffer()
+            buffer.add_stop(
+                session_id=session_id,
+                nas_ip_address=nas_ip,
+                username=username,
+                terminate_cause=terminate_cause,
+                session_time=session_time,
+                input_octets=input_octets,
+                output_octets=output_octets,
+                input_packets=input_packets,
+                output_packets=output_packets
+            )
+            logger.info(f"Session stop queued: {session_id} for user {username}, "
                        f"duration={session_time}s, in={input_octets}B, out={output_octets}B")
         except Exception as e:
-            logger.error(f"Error stopping session: {e}")
+            logger.error(f"Error queuing session stop: {e}")
     
     def _handle_interim_update(self, pkt: packet.AcctPacket,
                                session_id: Optional[str], nas_ip: str) -> None:
         """
         Handle Accounting-Interim-Update request.
         
-        Updates session statistics periodically.
+        Queues session statistics update in the buffer for batch processing.
         
         Args:
             pkt: The accounting packet
             session_id: Session identifier
             nas_ip: NAS IP address
         """
-        from sessions.models import RadiusSession
+        from sessions.buffer import get_session_buffer
         
         if not session_id:
             logger.warning("Acct-Interim-Update missing session ID")
             return
         
-        # Find the session
-        session = RadiusSession.find_session(session_id, nas_ip)
-        if not session:
-            logger.warning(f"Session {session_id} not found for interim update")
-            return
+        # Get username from packet for buffer tracking
+        username = self._get_attribute(pkt, 'User-Name') or ''
         
         # Get statistics from packet
         session_time = self._get_int_attribute(pkt, 'Acct-Session-Time')
@@ -250,22 +240,22 @@ class AccountingHandler:
         input_packets = self._get_int_attribute(pkt, 'Acct-Input-Packets')
         output_packets = self._get_int_attribute(pkt, 'Acct-Output-Packets')
         
-        # Update session statistics
+        # Queue the session update in the buffer
         try:
-            # Build arguments dict and filter out None values to handle optional attributes
-            update_kwargs = {
-                'session_time': session_time,
-                'input_octets': input_octets,
-                'output_octets': output_octets,
-                'input_packets': input_packets,
-                'output_packets': output_packets
-            }
-            update_kwargs = {k: v for k, v in update_kwargs.items() if v is not None}
-
-            session.update_statistics(**update_kwargs)
-            logger.debug(f"Session updated: {session_id}")
+            buffer = get_session_buffer()
+            buffer.add_update(
+                session_id=session_id,
+                nas_ip_address=nas_ip,
+                username=username,
+                session_time=session_time,
+                input_octets=input_octets,
+                output_octets=output_octets,
+                input_packets=input_packets,
+                output_packets=output_packets
+            )
+            logger.debug(f"Session update queued: {session_id}")
         except Exception as e:
-            logger.error(f"Error updating session: {e}")
+            logger.error(f"Error queuing session update: {e}")
     
     def _handle_accounting_on(self, nas_ip: str) -> None:
         """

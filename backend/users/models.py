@@ -189,8 +189,26 @@ class RadiusUser(models.Model):
     def get_active_session_count(self) -> int:
         """
         Get the number of currently active sessions for this user.
+        This only returns the count stored in the database field.
         """
         return self.current_sessions
+    
+    def get_total_active_session_count(self) -> int:
+        """
+        Get the total number of active sessions including pending ones in buffer.
+        This provides an accurate count for concurrent session limit checks.
+        """
+        db_count = self.current_sessions
+        
+        # Add pending sessions from buffer
+        try:
+            from sessions.buffer import get_session_buffer
+            buffer = get_session_buffer()
+            buffer_count = buffer.get_pending_session_count(self.username)
+        except Exception:
+            buffer_count = 0
+        
+        return db_count + buffer_count
     
     def update_session_counts(self) -> None:
         """
@@ -219,12 +237,14 @@ class RadiusUser(models.Model):
     def can_create_session(self) -> tuple[bool, str]:
         """
         Check if the user can create a new session.
+        Checks both database and buffer for accurate concurrent session count.
         """
         can_auth, reason = self.can_authenticate()
         if not can_auth:
             return False, reason
         
-        active_sessions = self.get_active_session_count()
+        # Get total active sessions including buffer
+        active_sessions = self.get_total_active_session_count()
         if active_sessions >= self.max_concurrent_sessions:
             return False, f"Maximum concurrent sessions ({self.max_concurrent_sessions}) reached"
         

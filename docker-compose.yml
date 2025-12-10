@@ -6,6 +6,7 @@ services:
     env_file:
       - .env
     environment:
+      TZ: ${TZ}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
@@ -38,5 +39,7 @@ services:
       - "1813:1813/udp"
     volumes:
       - ./nginx/ssl:/etc/nginx/ssl
+    environment:
+      TZ: ${TZ}
     env_file:
       - .env

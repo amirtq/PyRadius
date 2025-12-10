@@ -228,6 +228,15 @@ RADIUS_CONFIG = {
 }
 
 # =============================================================================
+# Session Buffer Configuration
+# =============================================================================
+
+# Interval for flushing session buffer to database (in seconds)
+SESSION_BUFFER_FLUSH_INTERVAL = get_env_variable(
+    'SESSION_BUFFER_FLUSH_INTERVAL', default=5, required=False, cast=int
+)
+
+# =============================================================================
 # Cleanup Jobs Configuration
 # =============================================================================
 
